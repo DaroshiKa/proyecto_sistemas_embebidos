@@ -42,19 +42,15 @@ Los movimientos de la mano robótica serán discretos y predefinidos, por lo que
 
 Entre los movimientos contemplados en el proyecto se encuentran:
 
--Movimiento del codo en el eje X.
+-Movimiento del codo en el eje XY.
 
--Movimiento del codo en el eje Y.
+-Movimiento del codo en el eje YZ.
 
 -Movimiento del codo en una posición intermedia entre ambos ejes.
 
--Apertura de la mano.
+-Apertura y cierre de la mano representado en dos posiciones posibles.
 
--Cierre de la mano.
-
--Movimiento de la muñeca en el eje X.
-
--Movimiento de la muñeca en el eje Y.
+-Movimiento de la muñeca en el eje XY.
 
 Adicionalmente, el sistema contará con una interfaz de usuario mediante una pantalla que permitirá configurar ciertos parámetros de funcionamiento del sistema, tales como la velocidad de ejecución de los movimientos y la sensibilidad con la que se detectan las señales musculares.
 
