@@ -16,21 +16,23 @@ El resultado esperado es un prototipo funcional que demuestre la capacidad de un
 
 ## Objetivo General
 
-Diseñar e implementar un sistema embebido capaz de interpretar señales eléctricas musculares generadas por el usuario y utilizarlas para controlar los movimientos discretos de una mano robótica, incorporando una arquitectura estructurada de hardware y firmware, así como una interfaz de configuración para el ajuste de parámetros de operación.
+Diseñar un sistema embebido capaz de interpretar señales eléctricas musculares generadas por el usuario.
 
 ## Objetivos específicos
 
--Diseñar el sistema de adquisición de señales electromiográficas que permita captar impulsos eléctricos musculares generados por el usuario.
+- Diseñar el sistema de adquisición de señales electromiográficas que permita captar impulsos eléctricos musculares generados por el usuario.
 
--Implementar un sistema de procesamiento de señales que permita identificar distintos tipos de impulsos musculares y asociarlos con comandos de movimiento específicos.
+- Ejecutar un sistema de procesamiento de señales que permita identificar distintos tipos de impulsos musculares y asociarlos con comandos de movimiento específicos.
 
--Desarrollar el sistema de control de actuadores encargado de ejecutar los movimientos mecánicos del codo, la muñeca y el mecanismo de apertura y cierre de la mano.
+- Desarrollar el sistema de control de actuadores encargado de ejecutar los movimientos mecánicos del codo, la muñeca y el mecanismo de apertura y cierre de la mano.
 
--Implementar una interfaz de usuario mediante una pantalla que permita ajustar parámetros del sistema como la velocidad de los movimientos y la sensibilidad de detección de las señales musculares.
+- Implementar una interfaz de usuario mediante una pantalla que permita ajustar parámetros del sistema, como la velocidad de los movimientos y la sensibilidad de detección de las señales musculares.
 
--Integrar el hardware y el firmware del sistema para garantizar la correcta comunicación entre sensores, unidad de procesamiento y actuadores.
+- Integrar el hardware y el firmware del sistema para garantizar la correcta comunicación entre sensores, unidad de procesamiento y actuadores.
 
--Realizar pruebas funcionales que permitan validar el correcto funcionamiento del sistema y la interpretación adecuada de los impulsos musculares.
+- Realizar pruebas funcionales que permitan validar el correcto funcionamiento del sistema y la interpretación adecuada de los impulsos musculares.
+
+- Controlar los movimientos discretos de una mano robótica, incorporando una arquitectura estructurada de hardware y firmware, así como una interfaz de configuración para el ajuste de parámetros de operación.
 
 ## Alcance del proyecto
 
