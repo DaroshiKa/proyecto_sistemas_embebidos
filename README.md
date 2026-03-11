@@ -1,18 +1,18 @@
 # Proyecto SE
-Este repositorio es para el proyecto es parte del curso de Sistemas Embebidos (2026-1), cuyo objetivo es crear un sistema funcional que aplique conceptos de hardware y firmware.
+Este repositorio es parte del proyecto del curso de Sistemas Embebidos (2026-1), cuyo objetivo es crear un sistema funcional que aplique conceptos de hardware y firmware.
 
 ## Introdccion
-El desarrollo de interfaces entre el cuerpo humano y sistemas robóticos es un área de gran interés dentro de la ingeniería, especialmente en aplicaciones relacionadas con prótesis, asistencia motora y control de dispositivos mecánicos mediante señales biológicas. Uno de los enfoques utilizados para lograr esta interacción es la captura de señales eléctricas generadas por la actividad muscular, conocidas como señales electromiográficas (EMG).
+El desarrollo de interfaces entre el cuerpo humano y sistemas robóticos es un área de gran importancia dentro de la ingeniería, especialmente en aplicaciones relacionadas con prótesis, asistencia motora y control de dispositivos mediante señales biológicas. Uno de los enfoques para lograr esta interacción es la captura de señales eléctricas generadas por la actividad muscular, conocidas como señales electromiográficas (EMG).
 
-Estas señales, aunque de baja intensidad, contienen información suficiente para identificar ciertos patrones de activación muscular que pueden ser interpretados por un sistema electrónico para generar comandos de control. Sin embargo, muchos sistemas existentes requieren procesamiento complejo de señales o hardware especializado, lo que aumenta significativamente la dificultad de implementación y el costo del sistema.
+Estas señales, aunque de baja intensidad, contienen suficiente información para identificar patrones de activación muscular que pueden ser capatados por un sistema electrónico para generar comandos de control. Sin embargo, muchos sistemas existentes requieren procesamiento complejo de señales o hardware especializado, lo que aumenta la dificultad de implementación y el costo del sistema.
 
-El problema que se plantea en este proyecto consiste en diseñar un sistema embebido capaz de captar impulsos eléctricos musculares generados por el usuario y traducirlos en comandos de movimiento para una estructura robótica con forma de mano. El sistema deberá interpretar estos impulsos y determinar qué tipo de movimiento debe ejecutarse en distintas partes del mecanismo.
+Este proyecto piensa establecer un sistema embebido capaz de captar impulsos eléctricos musculares generados por el usuario y traducirlos en comandos de movimiento para una estructura robótica con forma de mano. El sistema deberá interpretar estos impulsos y determinar qué tipo de movimiento debe ejecutarse en distintas partes del mecanismo.
 
 A diferencia de sistemas más complejos que permiten control proporcional continuo, el sistema propuesto utilizará movimientos discretos predefinidos. Esto significa que las señales detectadas no indicarán la magnitud exacta del movimiento, sino que activarán acciones específicas como mover el codo en una dirección determinada, abrir o cerrar la mano, o mover la muñeca en alguno de sus ejes permitidos.
 
 Para lograr esto, el sistema deberá integrar sensores capaces de detectar los impulsos eléctricos musculares, un microcontrolador encargado del procesamiento de la señal y la toma de decisiones, y un conjunto de actuadores que permitan ejecutar los movimientos mecánicos correspondientes. Además, el sistema incluirá una interfaz de usuario mediante una pantalla que permitirá ajustar parámetros de funcionamiento como la velocidad de los movimientos y la sensibilidad con la que se detectan los impulsos eléctricos.
 
-El resultado esperado es un prototipo funcional que demuestre la capacidad de un sistema embebido para interpretar señales biológicas simples y convertirlas en acciones mecánicas específicas dentro de una estructura robótica.
+El resultado esperado es un prototipo funcional que demuestre la capacidad de un sistema embebido para interpretar señales biológicas simples y convertirlas en acciones mecánicas dentro de una estructura robótica.
 
 ## Objetivo General
 
