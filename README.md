@@ -1,7 +1,7 @@
 # Proyecto SE
 Este repositorio es parte del proyecto del curso de Sistemas Embebidos (2026-1), cuyo objetivo es crear un sistema funcional que aplique conceptos de hardware y firmware.
 
-## Introdccion
+## Introduccion
 El desarrollo de interfaces entre el cuerpo humano y sistemas robóticos es un área de gran importancia dentro de la ingeniería, especialmente en aplicaciones relacionadas con prótesis, asistencia motora y control de dispositivos mediante señales biológicas. Uno de los enfoques para lograr esta interacción es la captura de señales eléctricas generadas por la actividad muscular, conocidas como señales electromiográficas (EMG).
 
 Estas señales, aunque de baja intensidad, contienen suficiente información para identificar patrones de activación muscular que pueden ser capatados por un sistema electrónico para generar comandos de control. Sin embargo, muchos sistemas existentes requieren procesamiento complejo de señales o hardware especializado, lo que aumenta la dificultad de implementación y el costo del sistema.
