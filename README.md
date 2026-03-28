@@ -73,82 +73,82 @@ Susana Del Toro Castaño
 Clara Isabel Botero Peréz
 
 ## Requerimientos Funcionales
-RF-01. Control de movimiento del codo mediante giroscopio
+1. Control de movimiento del codo mediante giroscopio
 
 El sistema deberá detectar la orientación del antebrazo mediante un sensor 
 giroscópico y generar movimientos del codo en los planos XY, XZ y YZ, de acuerdo con 
 las variaciones angulares registradas. 
 
-RF-02. Control del metacarpo mediante señales EMG 
+2. Control del metacarpo mediante señales EMG 
 
 El sistema deberá procesar señales electromiográficas (EMG) del usuario para 
 ejecutar movimientos discretos de flexión y extensión del metacarpo, asociados a 
 patrones de activación muscular previamente definidos. 
 
-RF-03. Definición de posición inicial 
+3. Definición de posición inicial 
 
 El sistema deberá permitir al usuario establecer una posición inicial de referencia del 
 brazo robótico mediante el panel de control. 
 
-RF-04. Retorno a posición inicial 
+4. Retorno a posición inicial 
 
 El sistema deberá permitir que el brazo robótico regrese automáticamente a la 
 posición inicial previamente definida, mediante una opción en el panel de control. 
 
-RF-05. Ajuste de velocidad de movimiento 
+5. Ajuste de velocidad de movimiento 
 
 El sistema deberá permitir modificar la velocidad de ejecución de los movimientos 
 del brazo robótico a través del panel de control. 
 
-RF-06. Ajuste de sensibilidad del giroscopio 
+6. Ajuste de sensibilidad del giroscopio 
 
 El sistema deberá permitir configurar la sensibilidad del sensor giroscópico, 
 modificando la respuesta del sistema ante los movimientos del antebrazo del 
 usuario, mediante el panel de control. 
 
-RF-07. Visualización de posición en el espacio 
+7. Visualización de posición en el espacio 
 
 El sistema deberá mostrar en el panel de control la posición del brazo robótico en un 
 sistema de coordenadas tridimensional (3D), tomando como referencia la posición 
 inicial definida (origen). 
 
-RF-08. Bloqueo del movimiento del codo 
+8. Bloqueo del movimiento del codo 
 
 El sistema deberá permitir bloquear y desbloquear el movimiento del codo mediante 
 un control en el panel de usuario. 
 
-RF-09. Bloqueo del movimiento del metacarpo 
+9. Bloqueo del movimiento del metacarpo 
 
 El sistema deberá permitir bloquear y desbloquear la flexión y extensión del 
 metacarpo mediante un control en el panel de usuario. 
 
-RF-10. Visualización de velocidad 
+10. Visualización de velocidad 
 
 El sistema deberá mostrar en el panel de control la velocidad actual de los 
 movimientos del brazo robótico. 
 
-RF-11. Visualización de sensibilidad 
+11. Visualización de sensibilidad 
 
 El sistema deberá mostrar en el panel de control los valores actuales de sensibilidad 
 configurados para el giroscopio y las señales EMG.
 
 ## Requerimientos no funcionales
-RNF-01. Tiempo de respuesta 
+1. Tiempo de respuesta 
 
 El sistema deberá responder a las señales EMG y del giroscopio en un tiempo máximo 
 de 100 ms. 
 
-RNF-02. Precisión de detección EMG 
+2. Precisión de detección EMG 
 
 El sistema deberá detectar señales EMG con una precisión mínima del 95% en la 
 identificación de movimientos predefinidos. 
 
-RNF-03. Seguridad del usuario 
+3. Seguridad del usuario 
 
 El sistema deberá garantizar aislamiento eléctrico entre el usuario (EMG) y los 
 circuitos de potencia para evitar riesgos. 
 
-RNF-04. Tolerancia a fallos 
+4. Tolerancia a fallos 
 
 El sistema deberá detectar y notificar fallos de sensores en un tiempo menor a 1 
 segundo.
@@ -215,6 +215,8 @@ Para el requerimiento no funcional 3, se realizarán mediciones con un multímet
 Prueba requerimiento 4: Tolerancia a fallos
 
 Para la prueba se desconectarán intencionalmente los sensores del sistema y con un cronómetro se medirá el tiempo que se tarda en detectar el fallo y generar una alerta. Se considerará adecuado un tiempo de detección inferior o igual a 1 segundo. 
- 
+
+## Plantilla para los test case (la misma recomendada en clase)
+
 
 
