@@ -218,5 +218,10 @@ Para la prueba se desconectarán intencionalmente los sensores del sistema y con
 
 ## Plantilla para los test case (la misma recomendada en clase)
 
+## Diagrama de bloques
+
+## Tabla de Componentes (Tener en Cuenta que los servo motores HITEC, ya estan adquiridos, NO hay que comprarlos).
+
+## Essquema General (Control, Potencia, Interfaz, Procesamiento, Mensajes).
 
 
