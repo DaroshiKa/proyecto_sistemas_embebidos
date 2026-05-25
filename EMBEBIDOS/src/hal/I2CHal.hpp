@@ -13,22 +13,41 @@ namespace HAL
             uint32_t frequency
         );
 
-        bool writeRegister(
+        bool addDevice(
             uint8_t deviceAddress,
+            uint32_t sclSpeedHz,
+            i2c_master_dev_handle_t& outHandle
+        );
+
+        bool writeRegister(
+            i2c_master_dev_handle_t device,
             uint8_t reg,
             uint8_t value
         );
 
         bool readRegister(
-            uint8_t deviceAddress,
+            i2c_master_dev_handle_t device,
             uint8_t reg,
-            uint8_t* data,
+            uint8_t& outValue
+        );
+
+        bool readBytes(
+            i2c_master_dev_handle_t device,
+            uint8_t startReg,
+            uint8_t* buffer,
             size_t length
         );
 
+        bool probe(
+            uint8_t deviceAddress
+        );
+
+        bool isInitialized() const
+        {
+            return busHandle_ != nullptr;
+        }
+
     private:
         i2c_master_bus_handle_t busHandle_ { nullptr };
-
-        i2c_master_dev_handle_t deviceHandle_ { nullptr };
     };
 }
