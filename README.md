@@ -225,3 +225,4 @@ Para la prueba se desconectarán intencionalmente los sensores del sistema y con
 ## Essquema General (Control, Potencia, Interfaz, Procesamiento, Mensajes).
 
 
+# Codigo-Emergencia
