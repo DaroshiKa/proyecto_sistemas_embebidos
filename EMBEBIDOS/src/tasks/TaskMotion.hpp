@@ -6,6 +6,7 @@
 
 #include "services/MotionService.hpp"
 #include "drivers/ServoManager.hpp"
+#include "core/TaskHeartbeat.hpp"
 
 namespace Tasks
 {
@@ -25,7 +26,8 @@ namespace Tasks
             Services::MotionService& motionService,
             Drivers::ServoManager& servoManager,
             QueueHandle_t commandQueue,
-            const TaskMotionConfig& config = TaskMotionConfig{}
+            const TaskMotionConfig& config = TaskMotionConfig{},
+            Core::TaskHeartbeat* heartbeat = nullptr
         );
 
         bool start();
@@ -40,6 +42,7 @@ namespace Tasks
         Drivers::ServoManager&   servos_;
         QueueHandle_t            queue_;
         TaskMotionConfig         config_;
+        Core::TaskHeartbeat*     heartbeat_ { nullptr };
         TaskHandle_t             handle_ { nullptr };
         volatile bool            running_ { false };
     };
