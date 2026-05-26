@@ -8,10 +8,12 @@ namespace Tasks
 
     TaskEMG::TaskEMG(
         Services::EMGService& service,
-        const TaskEMGConfig& config
+        const TaskEMGConfig& config,
+        Core::TaskHeartbeat* heartbeat                   // NUEVO
     )
         : service_(service),
-          config_(config)
+          config_(config),
+          heartbeat_(heartbeat)                          // NUEVO
     {
     }
 
@@ -67,12 +69,16 @@ namespace Tasks
 
     void TaskEMG::run()
     {
-        // No usamos vTaskDelayUntil: la cadencia la marca el DMA.
-        // El service.update() bloquea hasta que hay datos o timeout.
         while (running_)
         {
             service_.update();
-            // Cesión cooperativa mínima por si update() volvió rápido
+
+            // NUEVO en Etapa 9: patear heartbeat para SafetyMonitor
+            if (heartbeat_ != nullptr)
+            {
+                heartbeat_->kick();
+            }
+
             taskYIELD();
         }
     }

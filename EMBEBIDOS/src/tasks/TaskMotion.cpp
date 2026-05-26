@@ -11,12 +11,14 @@ namespace Tasks
         Services::MotionService& motionService,
         Drivers::ServoManager& servoManager,
         QueueHandle_t commandQueue,
-        const TaskMotionConfig& config
+        const TaskMotionConfig& config,
+        Core::TaskHeartbeat* heartbeat
     )
         : motion_(motionService),
           servos_(servoManager),
           queue_(commandQueue),
-          config_(config)
+          config_(config),
+          heartbeat_(heartbeat)
     {
     }
 
@@ -93,6 +95,12 @@ namespace Tasks
 
             // 2) Tick del bucle de control de servos (interpolación)
             servos_.tick(now);
+
+            // 3) NUEVO en Etapa 9: patear el heartbeat para SafetyMonitor
+            if (heartbeat_ != nullptr)
+            {
+                heartbeat_->kick();
+            }
 
             vTaskDelayUntil(&lastWake, period);
         }

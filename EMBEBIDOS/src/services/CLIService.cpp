@@ -5,6 +5,8 @@
 #include "esp_system.h"
 #include "esp_timer.h"
 
+#include "services/SafetyService.hpp"   // NUEVO en Etapa 9: necesario para usar el puntero
+
 namespace Services
 {
     CLIService::CLIService(
@@ -36,7 +38,6 @@ namespace Services
 
         if (!Communication::CommandParser::parse(line, p))
         {
-            // Línea vacía o comentario: re-imprime prompt
             return;
         }
 
@@ -78,7 +79,7 @@ namespace Services
         console_.writeLine("  servo status");
         console_.writeLine("  imu status | calibrate | raw");
         console_.writeLine("  emg status | calibrate | threshold <on> <off>");
-        console_.writeLine("  safety status");
+        console_.writeLine("  safety status | clear | safemode");   // ACTUALIZADO en Etapa 9
         console_.writeLine("  emergency_stop");
         console_.writeLine("  demo start | stop");
     }
@@ -171,7 +172,6 @@ namespace Services
             return;
         }
 
-        // Modo: servo <id> <angle>
         int id = 0;
         float angle = 0.0f;
 
@@ -264,16 +264,10 @@ namespace Services
                 return;
             }
 
-            // El CLI conoce sólo IEMGSource (interfaz). Para setThresholds
-            // necesitamos el servicio concreto. Esto se podría exponer en la
-            // interfaz; por ahora, se hace via puntero EMGService directo
-            // si fuera necesario. Aquí lo declaramos como TODO controlado:
             console_.printf(
                 "OK: threshold set requested on=%.2f off=%.2f\r\n",
                 onLv, offLv
             );
-            // Nota: en Etapa 10 NVS expondremos esto a través de un
-            // ConfigService dedicado para no inflar IEMGSource.
         }
         else
         {
@@ -281,15 +275,36 @@ namespace Services
         }
     }
 
+    // ---------- AMPLIADO en Etapa 9 ----------
     void CLIService::cmdSafety(const Communication::ParsedCommand& p)
     {
         if (Communication::CommandParser::equals(p.subverb, "status"))
         {
             printSafetyStats();
         }
+        else if (Communication::CommandParser::equals(p.subverb, "clear"))
+        {
+            if (deps_.safety == nullptr)
+            {
+                console_.writeLine("ERR: safety service not available");
+                return;
+            }
+            const bool ok = deps_.safety->clearEmergency();
+            console_.printf("Clear %s\r\n", ok ? "OK" : "DENIED (system unhealthy)");
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "safemode"))
+        {
+            if (deps_.safety == nullptr)
+            {
+                console_.writeLine("ERR: safety service not available");
+                return;
+            }
+            deps_.safety->enterSafeMode();
+            console_.writeLine("Entered SAFE_MODE");
+        }
         else
         {
-            console_.writeLine("ERR: safety status");
+            console_.writeLine("ERR: safety status | clear | safemode");
         }
     }
 
@@ -319,8 +334,6 @@ namespace Services
 
     void CLIService::cmdDemo(const Communication::ParsedCommand& p)
     {
-        // El demo se maneja en TaskCLI/DemoMode; aquí solo encolamos un comando
-        // declarativo que TaskCLI interpreta.
         if (Communication::CommandParser::equals(p.subverb, "start"))
         {
             dispatchMotion(Models::MotionType::DEMO_START);
@@ -509,24 +522,49 @@ namespace Services
                             emgStateStr(s.state),
                             s.calibrated ? "YES" : "NO");
         }
+
+        // NUEVO en Etapa 9: incluir estado del SafetyMonitor
+        if (deps_.safety != nullptr)
+        {
+            console_.printf("System state:  %s\r\n",
+                            systemStateStr(deps_.safety->currentState()));
+        }
     }
 
+    // ---------- AMPLIADO en Etapa 9 ----------
     void CLIService::printSafetyStats()
     {
-        if (deps_.dispatcherStats == nullptr)
-        {
-            console_.writeLine("ERR: dispatcher stats unavailable");
-            return;
-        }
-        auto* d = deps_.dispatcherStats;
         console_.writeLine("");
-        console_.writeLine("SAFETY / DISPATCHER");
-        console_.printf("  dispatched : %lu\r\n",
-                        static_cast<unsigned long>(d->totalDispatched()));
-        console_.printf("  rejected   : %lu\r\n",
-                        static_cast<unsigned long>(d->totalRejected()));
-        console_.printf("  dropped    : %lu\r\n",
-                        static_cast<unsigned long>(d->totalDropped()));
+        console_.writeLine("SAFETY");
+
+        if (deps_.safety != nullptr)
+        {
+            const auto state = deps_.safety->currentState();
+            console_.printf("  state          : %s\r\n", systemStateStr(state));
+            console_.printf("  emergencies    : %lu\r\n",
+                            static_cast<unsigned long>(deps_.safety->totalEmergencies()));
+            console_.printf("  recoveries     : %lu\r\n",
+                            static_cast<unsigned long>(deps_.safety->totalRecoveries()));
+            console_.printf("  task stalls    : %lu\r\n",
+                            static_cast<unsigned long>(deps_.safety->totalTaskStalls()));
+            console_.printf("  sensor timeouts: %lu\r\n",
+                            static_cast<unsigned long>(deps_.safety->totalSensorTimeouts()));
+        }
+        else
+        {
+            console_.writeLine("  safety service: NOT AVAILABLE");
+        }
+
+        if (deps_.dispatcherStats != nullptr)
+        {
+            auto* d = deps_.dispatcherStats;
+            console_.printf("  dispatched     : %lu\r\n",
+                            static_cast<unsigned long>(d->totalDispatched()));
+            console_.printf("  rejected       : %lu\r\n",
+                            static_cast<unsigned long>(d->totalRejected()));
+            console_.printf("  dropped        : %lu\r\n",
+                            static_cast<unsigned long>(d->totalDropped()));
+        }
     }
 
     // ---------- String helpers ----------
@@ -601,6 +639,22 @@ namespace Services
             case Models::EMGState::TIMEOUT:       return "TIMEOUT";
             case Models::EMGState::FAULT:         return "FAULT";
             default:                              return "?";
+        }
+    }
+
+    // ---------- NUEVO en Etapa 9 ----------
+    const char* CLIService::systemStateStr(Models::SystemState s) const
+    {
+        switch (s)
+        {
+            case Models::SystemState::INIT:           return "INIT";
+            case Models::SystemState::IDLE:           return "IDLE";
+            case Models::SystemState::ACTIVE:         return "ACTIVE";
+            case Models::SystemState::CALIBRATING:    return "CALIBRATING";
+            case Models::SystemState::ERROR:          return "ERROR";
+            case Models::SystemState::SAFE_MODE:      return "SAFE_MODE";
+            case Models::SystemState::EMERGENCY_STOP: return "EMERGENCY";
+            default:                                  return "?";
         }
     }
 }

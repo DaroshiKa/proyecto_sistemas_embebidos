@@ -7,6 +7,7 @@ idf_component_register(
         "core/QueueManager.cpp"
         "core/SystemContext.cpp"
         "core/BasicSafetyValidator.cpp"
+        "core/SystemStateMachine.cpp"          # ← NUEVO Etapa 9
 
         "hal/GPIOHal.cpp"
         "hal/ADCHal.cpp"
@@ -23,9 +24,17 @@ idf_component_register(
         "services/EMGService.cpp"
         "services/MotionService.cpp"
         "services/CLIService.cpp"
+        "services/SafetyService.cpp"           # ← NUEVO Etapa 9
 
         "communication/CommandParser.cpp"
         "communication/UARTConsole.cpp"
+        "communication/NextionInterface.cpp"
+        "communication/TelemetryPublisher.cpp"
+        "communication/SystemDataProvider.cpp"
+
+        "protocols/CRC16.cpp"
+        "protocols/PacketSerializer.cpp"
+        "protocols/PacketParser.cpp"
 
         "app/DemoMode.cpp"
 
@@ -33,6 +42,8 @@ idf_component_register(
         "tasks/TaskEMG.cpp"
         "tasks/TaskMotion.cpp"
         "tasks/TaskCLI.cpp"
+        "tasks/TaskNextionInterface.cpp"
+        "tasks/TaskSafety.cpp"                 # ← NUEVO Etapa 9
 
         "utils/ComplementaryFilter.cpp"
         "utils/PlaneDetector.cpp"
