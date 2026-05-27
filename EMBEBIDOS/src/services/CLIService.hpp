@@ -9,7 +9,7 @@
 #include "interfaces/IMotionExecutor.hpp"
 
 #include "core/CommandDispatcher.hpp"
-
+#include "interfaces/ISafetyMonitor.hpp"
 #include "models/MotionCommand.hpp"
 #include "models/ServoState.hpp"
 
@@ -17,14 +17,15 @@ namespace Services
 {
     // Dependencias necesarias para que el CLI pueda diagnosticar
     // y emitir comandos. Inyección opcional (nullptr = capacidad ausente).
-    struct CLIDependencies
-    {
-        Interfaces::ICommandDispatcher*  dispatcher  { nullptr };
-        Interfaces::IIMUSource*          imu         { nullptr };
-        Interfaces::IEMGSource*          emg         { nullptr };
-        Interfaces::IMotionExecutor*     executor    { nullptr };
-        Core::CommandDispatcher*         dispatcherStats { nullptr };  // para "safety status"
-    };
+   struct CLIDependencies
+{
+    Interfaces::ICommandDispatcher*  dispatcher       { nullptr };
+    Interfaces::IIMUSource*          imu              { nullptr };
+    Interfaces::IEMGSource*          emg              { nullptr };
+    Interfaces::IMotionExecutor*     executor         { nullptr };
+    Core::CommandDispatcher*         dispatcherStats  { nullptr };
+    Interfaces::ISafetyMonitor*      safetyMonitor    { nullptr };
+};
 
     class CLIService
     {

@@ -2,6 +2,7 @@
 
 #include "interfaces/IService.hpp"
 #include "interfaces/IMotionExecutor.hpp"
+#include "interfaces/ISafetyMonitor.hpp"
 
 #include "core/EventBus.hpp"
 
@@ -21,15 +22,17 @@ namespace Services
         );
 
         bool initialize() override;
-        void update() override;   // no usado en esta etapa; lo lleva TaskMotion
+        void update() override;
 
-        // Procesa un comando high-level proveniente del dispatcher.
+        // Inyección opcional: si está presente, los EMERGENCY_STOP
+        // se reportan al monitor para que entre en E-STOP_HOLD.
+        void attachSafetyMonitor(Interfaces::ISafetyMonitor* monitor);
+
         bool processMotionCommand(
             const Models::MotionCommand& command,
             uint32_t nowMs
         );
 
-        // Telemetría
         uint32_t totalExecuted() const { return totalExecuted_; }
         uint32_t totalIgnored()  const { return totalIgnored_; }
 
@@ -41,13 +44,14 @@ namespace Services
         bool dispatchElbowPlane(Models::MotionType plane, uint32_t now);
         bool dispatchHome(uint32_t now);
         bool dispatchCustomServo(const Models::MotionCommand& cmd, uint32_t now);
-        bool dispatchEmergencyStop();
+        bool dispatchEmergencyStop(const Models::MotionCommand& cmd);
 
         void publishExecuted(const Models::MotionCommand& cmd, uint32_t now);
 
         Interfaces::IMotionExecutor& executor_;
         Core::EventBus&              eventBus_;
         Models::MotionConfig         config_;
+        Interfaces::ISafetyMonitor*  safetyMonitor_ { nullptr };
 
         uint32_t totalExecuted_ { 0 };
         uint32_t totalIgnored_  { 0 };

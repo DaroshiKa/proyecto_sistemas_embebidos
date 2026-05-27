@@ -14,12 +14,17 @@
 #include "core/EventBus.hpp"
 #include "core/QueueManager.hpp"
 #include "core/CommandDispatcher.hpp"
-#include "core/BasicSafetyValidator.hpp"
+#include "core/AdvancedSafetyValidator.hpp"
 
 #include "services/IMUService.hpp"
 #include "services/EMGService.hpp"
 #include "services/MotionService.hpp"
 #include "services/CLIService.hpp"
+#include "services/SafetyService.hpp"
+#include "services/WatchdogManager.hpp"
+
+#include "adapters/IMUHealthAdapter.hpp"
+#include "adapters/EMGHealthAdapter.hpp"
 
 #include "communication/UARTConsole.hpp"
 
@@ -29,18 +34,33 @@
 #include "tasks/TaskEMG.hpp"
 #include "tasks/TaskMotion.hpp"
 #include "tasks/TaskCLI.hpp"
+#include "tasks/TaskSafety.hpp"
+#include "tasks/TaskSystemMonitor.hpp"
 
 #include "models/IMUConfig.hpp"
 #include "models/EMGConfig.hpp"
 #include "models/MotionConfig.hpp"
+#include "models/SafetyConfig.hpp"
 
 static const char* TAG = "MAIN";
 
+// ----------------------------------------------------------------------------
+// Callback estático del watchdog. NO podemos usar lambdas con captura
+// porque el TWDT de IDF requiere un function pointer estilo C.
+// ----------------------------------------------------------------------------
+static void watchdogCallback(void* arg)
+{
+    auto* safety = static_cast<Services::SafetyService*>(arg);
+    if (safety != nullptr) safety->onWatchdogTrigger();
+}
+
 extern "C" void app_main(void)
 {
-    ESP_LOGI(TAG, "Boot - Stage 7 CLI Integration");
+    ESP_LOGI(TAG, "Boot - Stage 9 Safety");
 
-    // ============ Core ============
+    // =========================================================
+    // 1) Core: EventBus + Queues
+    // =========================================================
     static Core::EventBus eventBus;
 
     if (!Core::QueueManager::initialize())
@@ -49,15 +69,9 @@ extern "C" void app_main(void)
         return;
     }
 
-    static Core::BasicSafetyValidator validator;
-
-    static Core::CommandDispatcher dispatcher(
-        validator,
-        Core::QueueManager::motionCommandQueue(),
-        &eventBus
-    );
-
-    // ============ HAL ============
+    // =========================================================
+    // 2) HAL
+    // =========================================================
     static HAL::I2CHal  i2c;
     static HAL::ADCHal  adc;
     static HAL::PWMHal  pwm;
@@ -66,16 +80,16 @@ extern "C" void app_main(void)
     Models::IMUConfig    imuCfg {};
     Models::EMGConfig    emgCfg {};
     Models::MotionConfig motionCfg {};
+    Models::SafetyConfig safetyCfg {};
 
     i2c.initialize(imuCfg.sdaPin, imuCfg.sclPin, imuCfg.busFrequencyHz);
 
-    // UART0: ya está configurado por ESP-IDF para logs. Para CLI usamos UART0
-    // también, lo cual coexiste con los logs (acceptable en debug).
-    // Pines TX/RX default de UART0: GPIO1/GPIO3.
     static Communication::UARTConsole console(uart, UART_NUM_0);
     console.bind(115200, GPIO_NUM_1, GPIO_NUM_3);
 
-    // ============ Drivers ============
+    // =========================================================
+    // 3) Drivers (hardware-facing)
+    // =========================================================
     static Drivers::MPU6050Driver mpu(i2c);
     static Drivers::EMGDriver     emgDriver(adc);
     static Drivers::ServoManager  servoManager(pwm, motionCfg);
@@ -83,10 +97,13 @@ extern "C" void app_main(void)
     if (!servoManager.initialize())
     {
         ESP_LOGE(TAG, "ServoManager init FAILED");
-        return;
+        // No tenemos actuadores: el sistema se queda en STARTUP y reporta INIT_FAILURE.
+        // Sí podemos seguir para CLI/diagnóstico.
     }
 
-    // ============ Services ============
+    // =========================================================
+    // 4) Services de sensor + Motion
+    // =========================================================
     static Services::MotionService motionService(
         servoManager, eventBus, motionCfg);
     motionService.initialize();
@@ -95,45 +112,102 @@ extern "C" void app_main(void)
     static Services::EMGService emgService(emgDriver, eventBus, emgCfg);
 
     const bool imuOk = imuService.initialize();
-    if (imuOk)
-    {
-        imuService.attachCommandDispatcher(&dispatcher);
-    }
-
     const bool emgOk = emgService.initialize();
-    if (emgOk)
+
+    // =========================================================
+    // 5) SafetyService + Adapters + Validator
+    //    Orden CRÍTICO: safety necesita ServoManager (IMotionExecutor).
+    // =========================================================
+    static Services::SafetyService safetyService(
+        servoManager, eventBus, safetyCfg);
+
+    if (!safetyService.initialize())
     {
-        emgService.attachCommandDispatcher(&dispatcher);
+        ESP_LOGE(TAG, "SafetyService init FAILED");
+        return;   // sin safety, no operamos
     }
 
-    // ============ CLI ============
+    static Adapters::IMUHealthAdapter imuHealth(imuOk ? &imuService : nullptr);
+    static Adapters::EMGHealthAdapter emgHealth(emgOk ? &emgService : nullptr);
+
+    safetyService.registerHealthProvider(&imuHealth);
+    safetyService.registerHealthProvider(&emgHealth);
+
+    static Core::AdvancedSafetyValidator validator(safetyService);
+
+    static Core::CommandDispatcher dispatcher(
+        validator,
+        Core::QueueManager::motionCommandQueue(),
+        &eventBus
+    );
+    dispatcher.attachSafetyService(&safetyService);
+
+    // Inyecciones tardías para resolver dependencias cíclicas conceptuales
+    motionService.attachSafetyMonitor(&safetyService);
+
+    // Conectar dispatchers a los servicios sensor
+    if (imuOk) imuService.attachCommandDispatcher(&dispatcher);
+    if (emgOk) emgService.attachCommandDispatcher(&dispatcher);
+
+    // =========================================================
+    // 6) Watchdog
+    // =========================================================
+    static Services::WatchdogManager watchdog;
+    const bool wdtOk = watchdog.initialize(
+        safetyCfg.watchdogTimeoutMs,
+        safetyCfg.watchdogPanicOnTrigger,
+        watchdogCallback,
+        &safetyService
+    );
+
+    if (!wdtOk)
+    {
+        ESP_LOGW(TAG, "Watchdog disabled (init failed)");
+    }
+
+    // =========================================================
+    // 7) CLI
+    // =========================================================
     Services::CLIDependencies cliDeps {};
     cliDeps.dispatcher      = &dispatcher;
     cliDeps.imu             = imuOk ? &imuService : nullptr;
     cliDeps.emg             = emgOk ? &emgService : nullptr;
     cliDeps.executor        = &servoManager;
     cliDeps.dispatcherStats = &dispatcher;
+    cliDeps.safetyMonitor   = &safetyService;
 
     static Services::CLIService cliService(console, cliDeps);
     static App::DemoMode        demoMode(dispatcher);
 
-    // ============ Tasks ============
+    // =========================================================
+    // 8) Tasks
+    // =========================================================
     static Tasks::TaskMotion taskMotion(
         motionService, servoManager,
         Core::QueueManager::motionCommandQueue()
     );
-    static Tasks::TaskCLI taskCli(console, cliService, demoMode);
+    taskMotion.attachWatchdog(&watchdog);
 
-    static Tasks::TaskIMU taskImu(imuService);
-    static Tasks::TaskEMG taskEmg(emgService);
+    static Tasks::TaskSafety        taskSafety(safetyService, watchdog);
+    static Tasks::TaskCLI           taskCli(console, cliService, demoMode);
+    static Tasks::TaskIMU           taskImu(imuService);
+    static Tasks::TaskEMG           taskEmg(emgService);
+    static Tasks::TaskSystemMonitor taskSysMon(safetyService);
 
+    // Iniciar Safety primero — debe estar listo antes que nadie mueva nada
+    taskSafety.start();
     taskMotion.start();
     taskCli.start();
 
     if (imuOk) taskImu.start();
     if (emgOk) taskEmg.start();
 
-    // Loop de app_main vacío: todo corre en sus tasks.
+    // Registrar tasks críticas en el monitor
+    taskSysMon.registerWatchedTask(taskMotion.handle(), "Motion");
+    taskSysMon.start();
+
+    ESP_LOGI(TAG, "Boot complete. Safety active.");
+
     while (true)
     {
         vTaskDelay(pdMS_TO_TICKS(10000));

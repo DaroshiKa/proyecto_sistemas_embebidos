@@ -17,7 +17,16 @@ namespace Models
 
         EMERGENCY_TRIGGERED,
 
-        CALIBRATION_COMPLETE
+        CALIBRATION_COMPLETE,
+
+        // ---------- Etapa 9 ----------
+        SAFETY_STATE_CHANGED,        // data → SafetyStatus*
+        SAFETY_FAULT_RAISED,         // data → SafetyFault*  (la nueva falta)
+        SAFETY_FAULT_CLEARED,        // data → SafetyFault*
+        SAFETY_COMMAND_REJECTED,     // data → MotionCommand*
+        SAFETY_RECOVERED,            // sin payload
+        WATCHDOG_WARNING,            // sin payload
+        HEAP_LOW                     // sin payload
     };
 
     struct EventMessage

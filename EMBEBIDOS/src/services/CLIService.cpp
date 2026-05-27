@@ -4,9 +4,17 @@
 
 #include "esp_system.h"
 #include "esp_timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
+#include "models/SafetyState.hpp"
 
 namespace Services
 {
+    // ==================================================================
+    // Construcción / banner / prompt
+    // ==================================================================
+
     CLIService::CLIService(
         Communication::UARTConsole& console,
         const CLIDependencies& deps
@@ -29,6 +37,10 @@ namespace Services
     {
         console_.write("> ");
     }
+
+    // ==================================================================
+    // Dispatch principal
+    // ==================================================================
 
     void CLIService::handleLine(const char* line)
     {
@@ -61,7 +73,9 @@ namespace Services
         }
     }
 
-    // ---------- Handlers ----------
+    // ==================================================================
+    // Help
+    // ==================================================================
 
     void CLIService::cmdHelp()
     {
@@ -78,10 +92,14 @@ namespace Services
         console_.writeLine("  servo status");
         console_.writeLine("  imu status | calibrate | raw");
         console_.writeLine("  emg status | calibrate | threshold <on> <off>");
-        console_.writeLine("  safety status");
+        console_.writeLine("  safety status | reset | clear");
         console_.writeLine("  emergency_stop");
         console_.writeLine("  demo start | stop");
     }
+
+    // ==================================================================
+    // System
+    // ==================================================================
 
     void CLIService::cmdSystem(const Communication::ParsedCommand& p)
     {
@@ -100,6 +118,10 @@ namespace Services
             console_.writeLine("ERR: system status | reset");
         }
     }
+
+    // ==================================================================
+    // Hand / Wrist / Elbow
+    // ==================================================================
 
     void CLIService::cmdHand(const Communication::ParsedCommand& p)
     {
@@ -153,6 +175,10 @@ namespace Services
         }
     }
 
+    // ==================================================================
+    // Home / Return-home
+    // ==================================================================
+
     void CLIService::cmdHome()
     {
         dispatchMotion(Models::MotionType::HOME);
@@ -162,6 +188,10 @@ namespace Services
     {
         dispatchMotion(Models::MotionType::RETURN_HOME);
     }
+
+    // ==================================================================
+    // Servo
+    // ==================================================================
 
     void CLIService::cmdServo(const Communication::ParsedCommand& p)
     {
@@ -190,6 +220,10 @@ namespace Services
 
         dispatchCustomServo(static_cast<uint8_t>(id), angle);
     }
+
+    // ==================================================================
+    // IMU
+    // ==================================================================
 
     void CLIService::cmdImu(const Communication::ParsedCommand& p)
     {
@@ -235,6 +269,10 @@ namespace Services
         }
     }
 
+    // ==================================================================
+    // EMG
+    // ==================================================================
+
     void CLIService::cmdEmg(const Communication::ParsedCommand& p)
     {
         if (deps_.emg == nullptr)
@@ -267,13 +305,12 @@ namespace Services
             // El CLI conoce sólo IEMGSource (interfaz). Para setThresholds
             // necesitamos el servicio concreto. Esto se podría exponer en la
             // interfaz; por ahora, se hace via puntero EMGService directo
-            // si fuera necesario. Aquí lo declaramos como TODO controlado:
+            // si fuera necesario. En Etapa 10 NVS expondremos esto a través
+            // de un ConfigService dedicado para no inflar IEMGSource.
             console_.printf(
                 "OK: threshold set requested on=%.2f off=%.2f\r\n",
                 onLv, offLv
             );
-            // Nota: en Etapa 10 NVS expondremos esto a través de un
-            // ConfigService dedicado para no inflar IEMGSource.
         }
         else
         {
@@ -281,17 +318,56 @@ namespace Services
         }
     }
 
+    // ==================================================================
+    // SAFETY  (Etapa 9 — actualizado)
+    //
+    // Subcomandos:
+    //   safety status  -> imprime estado FSM, faltas, contadores
+    //   safety reset   -> requestRecovery(): intenta salir de E-STOP_HOLD
+    //   safety clear   -> clearLatchedFaults(): borra historial de faltas
+    // ==================================================================
+
     void CLIService::cmdSafety(const Communication::ParsedCommand& p)
     {
         if (Communication::CommandParser::equals(p.subverb, "status"))
         {
             printSafetyStats();
         }
+        else if (Communication::CommandParser::equals(p.subverb, "reset"))
+        {
+            if (deps_.safetyMonitor == nullptr)
+            {
+                console_.writeLine("ERR: safety monitor not available");
+                return;
+            }
+            if (deps_.safetyMonitor->requestRecovery())
+            {
+                console_.writeLine("OK: recovery requested");
+            }
+            else
+            {
+                console_.writeLine("ERR: recovery denied (faults still active?)");
+            }
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "clear"))
+        {
+            if (deps_.safetyMonitor == nullptr)
+            {
+                console_.writeLine("ERR: safety monitor not available");
+                return;
+            }
+            deps_.safetyMonitor->clearLatchedFaults();
+            console_.writeLine("OK: latched faults cleared");
+        }
         else
         {
-            console_.writeLine("ERR: safety status");
+            console_.writeLine("ERR: safety status | reset | clear");
         }
     }
+
+    // ==================================================================
+    // Emergency stop
+    // ==================================================================
 
     void CLIService::cmdEmergencyStop()
     {
@@ -317,10 +393,15 @@ namespace Services
         }
     }
 
+    // ==================================================================
+    // Demo
+    // ==================================================================
+
     void CLIService::cmdDemo(const Communication::ParsedCommand& p)
     {
         // El demo se maneja en TaskCLI/DemoMode; aquí solo encolamos un comando
         // declarativo que TaskCLI interpreta.
+
         if (Communication::CommandParser::equals(p.subverb, "start"))
         {
             dispatchMotion(Models::MotionType::DEMO_START);
@@ -337,7 +418,9 @@ namespace Services
         }
     }
 
-    // ---------- Helpers de dispatch ----------
+    // ==================================================================
+    // Helpers de dispatch
+    // ==================================================================
 
     bool CLIService::dispatchMotion(
         Models::MotionType type,
@@ -405,7 +488,9 @@ namespace Services
         return ok;
     }
 
-    // ---------- Printers ----------
+    // ==================================================================
+    // Printers
+    // ==================================================================
 
     void CLIService::printServoStatusTable()
     {
@@ -509,27 +594,88 @@ namespace Services
                             emgStateStr(s.state),
                             s.calibrated ? "YES" : "NO");
         }
+
+        if (deps_.safetyMonitor != nullptr)
+        {
+            const auto safety = deps_.safetyMonitor->getStatus();
+            console_.printf("Safety state:  %s\r\n",
+                            Models::safetyStateToString(safety.state));
+        }
     }
+
+    // ==================================================================
+    // SAFETY STATS  (Etapa 9 — actualizado)
+    //
+    // Si SafetyMonitor está disponible, imprime estado FSM, faltas
+    // activas/latched, salud de sensores y métricas. Si no, cae al
+    // dispatcher stats como fallback (modo testing aislado).
+    // ==================================================================
 
     void CLIService::printSafetyStats()
     {
-        if (deps_.dispatcherStats == nullptr)
+        if (deps_.safetyMonitor == nullptr)
         {
-            console_.writeLine("ERR: dispatcher stats unavailable");
+            // Fallback al stats del dispatcher
+            if (deps_.dispatcherStats == nullptr)
+            {
+                console_.writeLine("ERR: no safety info available");
+                return;
+            }
+            console_.writeLine("");
+            console_.writeLine("SAFETY / DISPATCHER (fallback, no monitor)");
+            console_.printf(
+                "  dispatched=%lu rejected=%lu dropped=%lu\r\n",
+                static_cast<unsigned long>(deps_.dispatcherStats->totalDispatched()),
+                static_cast<unsigned long>(deps_.dispatcherStats->totalRejected()),
+                static_cast<unsigned long>(deps_.dispatcherStats->totalDropped())
+            );
             return;
         }
-        auto* d = deps_.dispatcherStats;
+
+        const auto st = deps_.safetyMonitor->getStatus();
+
         console_.writeLine("");
-        console_.writeLine("SAFETY / DISPATCHER");
-        console_.printf("  dispatched : %lu\r\n",
-                        static_cast<unsigned long>(d->totalDispatched()));
-        console_.printf("  rejected   : %lu\r\n",
-                        static_cast<unsigned long>(d->totalRejected()));
-        console_.printf("  dropped    : %lu\r\n",
-                        static_cast<unsigned long>(d->totalDropped()));
+        console_.writeLine("--- Safety Status ---");
+        console_.printf("  state            : %s\r\n",
+                        Models::safetyStateToString(st.state));
+        console_.printf("  active_faults    : 0x%04X\r\n",
+                        static_cast<unsigned>(st.activeFaults));
+        console_.printf("  latched_faults   : 0x%04X\r\n",
+                        static_cast<unsigned>(st.latchedFaults));
+        console_.printf("  imu_healthy      : %s\r\n", st.imuHealthy ? "yes" : "no");
+        console_.printf("  emg_healthy      : %s\r\n", st.emgHealthy ? "yes" : "no");
+        console_.printf("  total_estops     : %lu\r\n",
+                        static_cast<unsigned long>(st.totalEmergencyStops));
+        console_.printf("  total_recoveries : %lu\r\n",
+                        static_cast<unsigned long>(st.totalRecoveries));
+        console_.printf("  total_deg_trans  : %lu\r\n",
+                        static_cast<unsigned long>(st.totalTransitionsToDeg));
+        console_.printf("  cmds_rejected    : %lu\r\n",
+                        static_cast<unsigned long>(st.totalCommandsRejected));
+        console_.printf("  rate_limited     : %lu\r\n",
+                        static_cast<unsigned long>(st.rateLimitedCount));
+        console_.printf("  min_free_heap    : %lu bytes\r\n",
+                        static_cast<unsigned long>(st.minFreeHeapBytes));
+        console_.printf("  last_fault_ms    : %lu\r\n",
+                        static_cast<unsigned long>(st.lastFaultTimestampMs));
+        console_.printf("  last_transit_ms  : %lu\r\n",
+                        static_cast<unsigned long>(st.lastTransitionMs));
+
+        if (deps_.dispatcherStats != nullptr)
+        {
+            console_.writeLine("--- Dispatcher ---");
+            console_.printf(
+                "  dispatched=%lu rejected=%lu dropped=%lu\r\n",
+                static_cast<unsigned long>(deps_.dispatcherStats->totalDispatched()),
+                static_cast<unsigned long>(deps_.dispatcherStats->totalRejected()),
+                static_cast<unsigned long>(deps_.dispatcherStats->totalDropped())
+            );
+        }
     }
 
-    // ---------- String helpers ----------
+    // ==================================================================
+    // String helpers (enum → const char*)
+    // ==================================================================
 
     const char* CLIService::motionTypeStr(Models::MotionType t) const
     {

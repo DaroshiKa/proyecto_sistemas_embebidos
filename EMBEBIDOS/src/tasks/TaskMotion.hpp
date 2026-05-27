@@ -7,15 +7,18 @@
 #include "services/MotionService.hpp"
 #include "drivers/ServoManager.hpp"
 
+namespace Services { class WatchdogManager; }
+
 namespace Tasks
 {
     struct TaskMotionConfig
     {
-        uint32_t   periodMs    { 10 };       // 100 Hz
+        uint32_t   periodMs    { 10 };
         uint32_t   stackSize   { 4096 };
-        UBaseType_t priority   { 7 };        // mayor que EMG (6) e IMU (5)
+        UBaseType_t priority   { 7 };
         BaseType_t  coreId     { 1 };
         const char* name       { "TaskMotion" };
+        bool        useWatchdog { true };
     };
 
     class TaskMotion
@@ -28,19 +31,25 @@ namespace Tasks
             const TaskMotionConfig& config = TaskMotionConfig{}
         );
 
+        // Inyección opcional del watchdog para alimentación periódica.
+        void attachWatchdog(Services::WatchdogManager* wdt);
+
         bool start();
         void stop();
         bool isRunning() const { return handle_ != nullptr; }
+
+        TaskHandle_t handle() const { return handle_; }
 
     private:
         static void taskEntry(void* arg);
         void run();
 
-        Services::MotionService& motion_;
-        Drivers::ServoManager&   servos_;
-        QueueHandle_t            queue_;
-        TaskMotionConfig         config_;
-        TaskHandle_t             handle_ { nullptr };
-        volatile bool            running_ { false };
+        Services::MotionService&   motion_;
+        Drivers::ServoManager&     servos_;
+        QueueHandle_t              queue_;
+        TaskMotionConfig           config_;
+        Services::WatchdogManager* watchdog_ { nullptr };
+        TaskHandle_t               handle_   { nullptr };
+        volatile bool              running_  { false };
     };
 }

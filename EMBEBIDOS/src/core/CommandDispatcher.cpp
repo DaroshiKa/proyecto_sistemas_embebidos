@@ -3,6 +3,8 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 
+#include "services/SafetyService.hpp"
+
 namespace Core
 {
     static constexpr const char* TAG = "Dispatcher";
@@ -18,6 +20,11 @@ namespace Core
     {
     }
 
+    void CommandDispatcher::attachSafetyService(Services::SafetyService* safety)
+    {
+        safety_ = safety;
+    }
+
     bool CommandDispatcher::dispatch(
         const Models::MotionCommand& command
     )
@@ -27,7 +34,6 @@ namespace Core
             return false;
         }
 
-        // 1) Validación de seguridad
         if (!validator_.validate(command))
         {
             ++totalRejected_;
@@ -40,7 +46,6 @@ namespace Core
             return false;
         }
 
-        // 2) Comandos críticos: vaciar queue y encolar al frente
         if (command.priority == Models::CommandPriority::CRITICAL)
         {
             xQueueReset(outputQueue_);
@@ -48,15 +53,16 @@ namespace Core
             if (xQueueSendToFront(outputQueue_, &command, 0) != pdTRUE)
             {
                 ++totalDropped_;
+                if (safety_ != nullptr) safety_->reportQueueDropped();
                 return false;
             }
         }
         else
         {
-            // 3) Comandos normales: FIFO. No bloqueamos: si está llena, drop.
             if (xQueueSend(outputQueue_, &command, 0) != pdTRUE)
             {
                 ++totalDropped_;
+                if (safety_ != nullptr) safety_->reportQueueDropped();
                 ESP_LOGW(TAG, "Queue full, command dropped");
                 return false;
             }
