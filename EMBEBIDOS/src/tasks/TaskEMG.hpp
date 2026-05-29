@@ -4,14 +4,15 @@
 #include "freertos/task.h"
 
 #include "services/EMGService.hpp"
+#include "core/TaskHeartbeat.hpp"
 
 namespace Tasks
 {
     struct TaskEMGConfig
     {
         uint32_t   stackSize { 6144 };
-        UBaseType_t priority { 6 };       // mayor que IMU (5), por urgencia EMG
-        BaseType_t  coreId   { 1 };       // pinned al core 1
+        UBaseType_t priority { 6 };
+        BaseType_t  coreId   { 1 };
         const char* name     { "TaskEMG" };
     };
 
@@ -20,7 +21,8 @@ namespace Tasks
     public:
         TaskEMG(
             Services::EMGService& service,
-            const TaskEMGConfig& config = TaskEMGConfig{}
+            const TaskEMGConfig& config = TaskEMGConfig{},
+            Core::TaskHeartbeat* heartbeat = nullptr     // NUEVO en Etapa 9
         );
 
         bool start();
@@ -34,6 +36,7 @@ namespace Tasks
 
         Services::EMGService& service_;
         TaskEMGConfig         config_;
+        Core::TaskHeartbeat*  heartbeat_ { nullptr };    // NUEVO en Etapa 9
         TaskHandle_t          handle_ { nullptr };
         volatile bool         running_ { false };
     };
