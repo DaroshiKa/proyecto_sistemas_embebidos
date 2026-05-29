@@ -46,13 +46,9 @@ Entre los movimientos contemplados en el proyecto se encuentran:
 
 -Movimiento del codo en el eje XY.
 
--Movimiento del codo en el eje YZ.
-
--Movimiento del codo en una posición intermedia entre ambos ejes.
-
 -Apertura y cierre de la mano representado en dos posiciones posibles.
 
--Movimiento de la muñeca en el eje XY.
+-Ligera rotación de la muñeca.
 
 Adicionalmente, el sistema contará con una interfaz de usuario mediante una pantalla que permitirá configurar ciertos parámetros de funcionamiento del sistema, tales como la velocidad de ejecución de los movimientos y la sensibilidad con la que se detectan las señales musculares.
 
@@ -136,11 +132,11 @@ configurados para el giroscopio y las señales EMG.
 1. Tiempo de respuesta 
 
 El sistema deberá responder a las señales EMG y del giroscopio en un tiempo máximo 
-de 100 ms. 
+de 500 ms. 
 
 2. Precisión de detección EMG 
 
-El sistema deberá detectar señales EMG con una precisión mínima del 95% en la 
+El sistema deberá detectar señales EMG con una precisión mínima del 70% en la 
 identificación de movimientos predefinidos. 
 
 3. Seguridad del usuario 
