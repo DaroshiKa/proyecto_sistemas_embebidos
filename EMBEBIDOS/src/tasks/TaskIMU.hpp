@@ -4,7 +4,6 @@
 #include "freertos/task.h"
 
 #include "services/IMUService.hpp"
-#include "core/TaskHeartbeat.hpp"
 
 namespace Tasks
 {
@@ -13,7 +12,7 @@ namespace Tasks
         uint32_t   periodMs   { 10 };       // 100 Hz por defecto
         uint32_t   stackSize  { 4096 };
         UBaseType_t priority  { 5 };
-        BaseType_t  coreId    { 1 };
+        BaseType_t  coreId    { 1 };        // pinned al core 1
         const char* name      { "TaskIMU" };
     };
 
@@ -22,22 +21,23 @@ namespace Tasks
     public:
         TaskIMU(
             Services::IMUService& service,
-            const TaskIMUConfig& config = TaskIMUConfig{},
-            Core::TaskHeartbeat* heartbeat = nullptr     // NUEVO en Etapa 9
+            const TaskIMUConfig& config = TaskIMUConfig{}
         );
 
         bool start();
+
         void stop();
+
         bool isRunning() const { return handle_ != nullptr; }
         TaskHandle_t handle() const { return handle_; }
 
     private:
         static void taskEntry(void* arg);
+
         void run();
 
         Services::IMUService& service_;
         TaskIMUConfig         config_;
-        Core::TaskHeartbeat*  heartbeat_ { nullptr };    // NUEVO en Etapa 9
         TaskHandle_t          handle_ { nullptr };
         volatile bool         running_ { false };
     };
