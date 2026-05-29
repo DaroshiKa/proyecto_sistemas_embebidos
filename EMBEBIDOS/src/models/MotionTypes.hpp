@@ -26,8 +26,7 @@ namespace Models
         DEMO_START,
         DEMO_STOP,
 
-        EMERGENCY_STOP,
-        CLEAR_EMERGENCY    // ← NUEVO (Etapa 9)
+        EMERGENCY_STOP
     };
 
     enum class CommandSource : uint8_t
@@ -39,8 +38,7 @@ namespace Models
         NEXTION,
         BLE,
         ROS2,
-        DEMO,
-        SAFETY             // ← NUEVO (Etapa 9): comandos generados por TaskSafety
+        DEMO
     };
 
     enum class CommandPriority : uint8_t
@@ -68,23 +66,5 @@ namespace Models
         WARNING,
         ERROR,
         CRITICAL
-    };
-
-    // NUEVO (Etapa 9): causa específica de una alarma. Permite a CLI/Nextion
-    // mostrar mensajes precisos sin acoplarse a strings.
-    enum class AlarmCode : uint8_t
-    {
-        NONE = 0,
-        SENSOR_IMU_TIMEOUT,
-        SENSOR_EMG_TIMEOUT,
-        SENSOR_RECONNECTED,
-        INVALID_COMMAND,
-        OUT_OF_RANGE,
-        EMERGENCY_STOP_TRIGGERED,
-        EMERGENCY_CLEARED,
-        SAFE_MODE_ENTERED,
-        SAFE_MODE_EXITED,
-        TASK_WATCHDOG_NEAR_TIMEOUT,
-        FAULT_UNRECOVERABLE
     };
 }

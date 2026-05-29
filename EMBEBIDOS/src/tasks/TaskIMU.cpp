@@ -8,18 +8,19 @@ namespace Tasks
 
     TaskIMU::TaskIMU(
         Services::IMUService& service,
-        const TaskIMUConfig& config,
-        Core::TaskHeartbeat* heartbeat                   // NUEVO
+        const TaskIMUConfig& config
     )
         : service_(service),
-          config_(config),
-          heartbeat_(heartbeat)                          // NUEVO
+          config_(config)
     {
     }
 
     bool TaskIMU::start()
     {
-        if (handle_ != nullptr) return true;
+        if (handle_ != nullptr)
+        {
+            return true;
+        }
 
         running_ = true;
 
@@ -48,13 +49,20 @@ namespace Tasks
             static_cast<int>(config_.coreId),
             static_cast<unsigned long>(config_.periodMs)
         );
+
         return true;
     }
 
     void TaskIMU::stop()
     {
-        if (handle_ == nullptr) return;
+        if (handle_ == nullptr)
+        {
+            return;
+        }
+
         running_ = false;
+
+        // Cooperativo: el loop saldrá en la siguiente iteración
     }
 
     void TaskIMU::taskEntry(void* arg)
@@ -62,6 +70,7 @@ namespace Tasks
         auto* self = static_cast<TaskIMU*>(arg);
         self->run();
 
+        // Si run() retorna, la tarea se destruye limpiamente
         TaskHandle_t toDelete = self->handle_;
         self->handle_ = nullptr;
         vTaskDelete(toDelete);
@@ -76,12 +85,7 @@ namespace Tasks
         {
             service_.update();
 
-            // NUEVO en Etapa 9: patear heartbeat para SafetyMonitor
-            if (heartbeat_ != nullptr)
-            {
-                heartbeat_->kick();
-            }
-
+            // Loop cadenciado: vTaskDelayUntil garantiza periodicidad estricta
             vTaskDelayUntil(&lastWake, period);
         }
     }
