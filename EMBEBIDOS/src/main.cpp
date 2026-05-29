@@ -1,52 +1,100 @@
+// ============================================================
+// EMBEBIDOS — Firmware mano robótica EMG + IMU
+// main.cpp — Etapa 9: Safety + FSM + Watchdog integrados
+// ============================================================
+
 #include "esp_log.h"
+#include "esp_timer.h"
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+<<<<<<< HEAD
 #include "tasks/TaskDiagnostics.hpp"
+=======
+
+// ------------ Core ------------
+#include "core/EventBus.hpp"
+#include "core/CommandDispatcher.hpp"
+#include "core/QueueManager.hpp"
+#include "core/SystemContext.hpp"
+#include "core/SystemStateMachine.hpp"
+
+// ------------ HAL ------------
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
 #include "hal/I2CHal.hpp"
-#include "hal/ADCHal.hpp"
 #include "hal/PWMHal.hpp"
 #include "hal/UARTHal.hpp"
 
+// ------------ Drivers ------------
+#include "drivers/ServoDriver.hpp"
+#include "drivers/ServoManager.hpp"
 #include "drivers/MPU6050Driver.hpp"
 #include "drivers/EMGDriver.hpp"
+<<<<<<< HEAD
 #include "drivers/ServoManager.hpp"
 
 #include "core/EventBus.hpp"
 #include "core/QueueManager.hpp"
 #include "core/CommandDispatcher.hpp"
 #include "core/AdvancedSafetyValidator.hpp"
+=======
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
 
+// ------------ Services ------------
 #include "services/IMUService.hpp"
 #include "services/EMGService.hpp"
 #include "services/MotionService.hpp"
 #include "services/CLIService.hpp"
 #include "services/SafetyService.hpp"
+<<<<<<< HEAD
 #include "services/WatchdogManager.hpp"
 
 #include "adapters/IMUHealthAdapter.hpp"
 #include "adapters/EMGHealthAdapter.hpp"
+=======
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
 
+// ------------ Communication ------------
 #include "communication/UARTConsole.hpp"
+#include "communication/NextionInterface.hpp"
+#include "communication/TelemetryPublisher.hpp"
+#include "communication/SystemDataProvider.hpp"
 
+// ------------ App ------------
 #include "app/DemoMode.hpp"
 
+// ------------ Tasks ------------
 #include "tasks/TaskIMU.hpp"
 #include "tasks/TaskEMG.hpp"
 #include "tasks/TaskMotion.hpp"
 #include "tasks/TaskCLI.hpp"
+<<<<<<< HEAD
 #include "tasks/TaskSafety.hpp"
 #include "tasks/TaskSystemMonitor.hpp"
+=======
+#include "tasks/TaskNextionInterface.hpp"
+#include "tasks/TaskSafety.hpp"
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
 
+// ------------ Interfaces ------------
+#include "interfaces/ISensorHealthSource.hpp"
+
+// ------------ Models ------------
 #include "models/IMUConfig.hpp"
 #include "models/EMGConfig.hpp"
 #include "models/MotionConfig.hpp"
 #include "models/SafetyConfig.hpp"
+<<<<<<< HEAD
 #include "services/NVSStorage.hpp"
 #include "services/ConfigService.hpp"
 #include "services/CalibrationManager.hpp"
+=======
+#include "models/ServoConfig.hpp"
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
 
-static const char* TAG = "MAIN";
+static constexpr const char* TAG = "MAIN";
 
+<<<<<<< HEAD
 // ----------------------------------------------------------------------------
 // Callback estático del watchdog. NO podemos usar lambdas con captura
 // porque el TWDT de IDF requiere un function pointer estilo C.
@@ -78,6 +126,70 @@ extern "C" void app_main(void)
     // =========================================================
     // 1) Core: EventBus + Queues
     // =========================================================
+=======
+// ============================================================
+// Adapters ISensorHealthSource — viven aquí porque su única
+// razón de existir es enchufar IMUService y EMGService al
+// SafetyService sin tocar esos servicios. Patrón Adapter.
+// ============================================================
+class ImuHealthAdapter final : public Interfaces::ISensorHealthSource
+{
+public:
+    explicit ImuHealthAdapter(Services::IMUService& s) : svc_(s) {}
+
+    uint32_t lastSampleTimestampMs() const override
+    {
+        return svc_.status().lastUpdateMs;
+    }
+
+    bool isSensorOk() const override
+    {
+        return svc_.status().state == Models::IMUState::OK;
+    }
+
+private:
+    Services::IMUService& svc_;
+};
+
+class EmgHealthAdapter final : public Interfaces::ISensorHealthSource
+{
+public:
+    explicit EmgHealthAdapter(Services::EMGService& s) : svc_(s) {}
+
+    uint32_t lastSampleTimestampMs() const override
+    {
+        return svc_.status().lastUpdateMs;
+    }
+
+    bool isSensorOk() const override
+    {
+        return svc_.status().state == Models::EMGState::OK;
+    }
+
+private:
+    Services::EMGService& svc_;
+};
+
+// ============================================================
+// Queue de TX para Nextion (declarada global estática para que
+// TelemetryPublisher y TaskNextionInterface compartan handle).
+// ============================================================
+static QueueHandle_t s_nextionTxQueue = nullptr;
+
+// ============================================================
+// Entry point ESP-IDF
+// ============================================================
+extern "C" void app_main(void)
+{
+    ESP_LOGI(TAG, "=========================================");
+    ESP_LOGI(TAG, "  EMBEBIDOS - Hand Robot Firmware");
+    ESP_LOGI(TAG, "  Stage 9: Safety + FSM + Watchdog");
+    ESP_LOGI(TAG, "=========================================");
+
+    // ============================================================
+    // 1) Infraestructura base: EventBus, Queues, EventGroups
+    // ============================================================
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
     static Core::EventBus eventBus;
 
     if (!Core::QueueManager::initialize())
@@ -86,6 +198,7 @@ extern "C" void app_main(void)
         return;
     }
 
+<<<<<<< HEAD
     // =========================================================
     // 2) HAL
     // =========================================================
@@ -133,6 +246,129 @@ extern "C" void app_main(void)
     // =========================================================
     // 4) Services de sensor + Motion
     // =========================================================
+=======
+    if (!Core::SystemContext::initialize())
+    {
+        ESP_LOGE(TAG, "SystemContext init failed");
+        return;
+    }
+
+    s_nextionTxQueue = xQueueCreate(
+        16,
+        sizeof(Models::TelemetryFrame)
+    );
+
+    if (s_nextionTxQueue == nullptr)
+    {
+        ESP_LOGE(TAG, "Nextion TX queue creation failed");
+        return;
+    }
+
+    // ============================================================
+    // 2) FSM global del sistema (debe existir ANTES de SafetyService)
+    // ============================================================
+    static Core::SystemStateMachine fsm(eventBus);
+    if (!fsm.initialize())
+    {
+        ESP_LOGE(TAG, "FSM init failed");
+        return;
+    }
+
+    // ============================================================
+    // 3) SafetyService — implementa ISafetyValidator. Sustituye al
+    //    BasicSafetyValidator usado en etapas previas.
+    // ============================================================
+    static Services::SafetyService safety(
+        fsm,
+        eventBus,
+        Models::SafetyConfig{}
+    );
+
+    if (!safety.initialize())
+    {
+        ESP_LOGE(TAG, "SafetyService init failed");
+        return;
+    }
+
+    // ============================================================
+    // 4) CommandDispatcher con SafetyService como validador
+    // ============================================================
+    static Core::CommandDispatcher dispatcher(
+        safety,
+        Core::QueueManager::motionCommandQueue(),
+        &eventBus
+    );
+
+    // ============================================================
+    // 5) HAL: I2C, PWM, UART (consola y Nextion)
+    // ============================================================
+    static HAL::I2CHal i2cBus;
+    const bool i2cOk = i2cBus.initialize(
+        GPIO_NUM_21,   // SDA
+        GPIO_NUM_22,   // SCL
+        400000
+    );
+    if (!i2cOk)
+    {
+        ESP_LOGW(TAG, "I2C bus init failed - IMU will be disabled");
+    }
+
+    static HAL::PWMHal pwm;
+    if (!pwm.initialize())
+    {
+        ESP_LOGE(TAG, "PWM init failed");
+        return;
+    }
+
+    static HAL::UARTHal uartConsoleHal;
+    if (!uartConsoleHal.initialize(
+            UART_NUM_0,
+            115200,
+            GPIO_NUM_1,    // TX
+            GPIO_NUM_3))   // RX
+    {
+        ESP_LOGE(TAG, "UART0 (console) init failed");
+        return;
+    }
+
+    static HAL::UARTHal uartNextionHal;
+    if (!uartNextionHal.initialize(
+            UART_NUM_2,
+            115200,
+            GPIO_NUM_17,   // TX
+            GPIO_NUM_16))  // RX
+    {
+        ESP_LOGW(TAG, "UART2 (Nextion) init failed - HMI disabled");
+    }
+
+    // ============================================================
+    // 6) Drivers
+    // ============================================================
+    static Drivers::ServoManager servoManager(pwm);
+    if (!servoManager.initialize(Models::ServoConfig{}))
+    {
+        ESP_LOGE(TAG, "ServoManager init failed");
+        return;
+    }
+
+    static Drivers::MPU6050Driver mpu(i2cBus);
+    const bool imuOk = i2cOk && mpu.initialize(Models::IMUConfig{});
+    if (!imuOk)
+    {
+        ESP_LOGW(TAG, "MPU6050 init failed - IMU service disabled");
+    }
+
+    static Drivers::EMGDriver emgDriver;
+    const bool emgDriverOk = emgDriver.initialize(Models::EMGConfig{});
+    if (!emgDriverOk)
+    {
+        ESP_LOGW(TAG, "EMG driver init failed - EMG service disabled");
+    }
+
+    // ============================================================
+    // 7) Services
+    // ============================================================
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
     static Services::MotionService motionService(
         servoManager,
         eventBus,
@@ -140,6 +376,7 @@ extern "C" void app_main(void)
     );
     motionService.initialize();
 
+<<<<<<< HEAD
     static Services::IMUService imuService(mpu, eventBus, imuCfg);
     static Services::EMGService emgService(emgDriver, eventBus, emgCfg);
 
@@ -172,11 +409,32 @@ extern "C" void app_main(void)
         servoManager, eventBus, safetyCfg);
 
     if (!safetyService.initialize())
+=======
+    static Services::IMUService imuService(
+        mpu,
+        eventBus,
+        Models::IMUConfig{}
+    );
+    const bool imuSvcOk = imuOk && imuService.initialize();
+    if (imuSvcOk)
+    {
+        imuService.attachCommandDispatcher(&dispatcher);
+    }
+
+    static Services::EMGService emgService(
+        emgDriver,
+        eventBus,
+        Models::EMGConfig{}
+    );
+    const bool emgSvcOk = emgDriverOk && emgService.initialize();
+    if (emgSvcOk)
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
     {
         ESP_LOGE(TAG, "SafetyService init FAILED");
         return;   // sin safety, no operamos
     }
 
+<<<<<<< HEAD
     static Adapters::IMUHealthAdapter imuHealth(imuOk ? &imuService : nullptr);
     static Adapters::EMGHealthAdapter emgHealth(emgOk ? &emgService : nullptr);
 
@@ -218,6 +476,7 @@ extern "C" void app_main(void)
     // =========================================================
     // 7) CLI
     // =========================================================
+=======
     // ============================================================
     // 8) Adapters de salud — enchufar al SafetyService SOLO si el
     //    servicio correspondiente arrancó OK.
@@ -251,6 +510,7 @@ extern "C" void app_main(void)
     // ============================================================
     // 10) CLI: ahora con safety inyectado
     // ============================================================
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
     Services::CLIDependencies cliDeps {};
     cliDeps.console         = &console;
     cliDeps.dispatcher      = &dispatcher;
@@ -262,6 +522,7 @@ extern "C" void app_main(void)
         : nullptr;
     cliDeps.executor        = &servoManager;
     cliDeps.dispatcherStats = &dispatcher;
+<<<<<<< HEAD
     cliDeps.safetyMonitor   = &safetyService;
     cliDeps.configService   = &configService;
     cliDeps.calibrationMgr  = &calibrationMgr;
@@ -288,6 +549,7 @@ extern "C" void app_main(void)
     // =========================================================
     // 9) Tasks
     // =========================================================
+=======
     cliDeps.safety          = &safety;
 
     static Services::CLIService cliService(console, cliDeps);
@@ -298,11 +560,13 @@ extern "C" void app_main(void)
     // ============================================================
     // 11) Tasks RTOS
     // ============================================================
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
     static Tasks::TaskMotion taskMotion(
         motionService,
         servoManager,
         Core::QueueManager::motionCommandQueue()
     );
+<<<<<<< HEAD
     taskMotion.attachWatchdog(&watchdog);
 
     static Tasks::TaskSafety        taskSafety(safetyService, watchdog);
@@ -318,6 +582,7 @@ extern "C" void app_main(void)
         safetyService.triggerEmergencyStop(
             Models::SafetyFault::INIT_FAILURE);
     }
+=======
 
     static Tasks::TaskCLI taskCli(console, cliService, demoMode);
 
@@ -331,6 +596,7 @@ extern "C" void app_main(void)
 
     static Tasks::TaskIMU taskImu(imuService);
     static Tasks::TaskEMG taskEmg(emgService);
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
 
     if (!taskMotion.start())
     {
@@ -363,6 +629,7 @@ extern "C" void app_main(void)
     // ============================================================
     fsm.bootComplete();
 
+<<<<<<< HEAD
     // ---- Registrar TODAS las tasks críticas en SystemMonitor ----
     taskSysMon.registerWatchedTask(taskMotion.handle(),  "Motion");
     taskSysMon.registerWatchedTask(taskSafety.handle(),  "Safety");
@@ -413,6 +680,7 @@ extern "C" void app_main(void)
             // Mantenemos la task viva para que el watchdog del bootloader
             // siga teniendo este símbolo; las tasks RTOS siguen corriendo.
         }
+=======
     static Tasks::TaskSafety taskSafety(safety);
     if (!taskSafety.start())
     {
@@ -436,5 +704,6 @@ extern "C" void app_main(void)
         telemetryPub.publishPeriodic(nowMs);
 
         vTaskDelay(pdMS_TO_TICKS(50));
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
     }
 }

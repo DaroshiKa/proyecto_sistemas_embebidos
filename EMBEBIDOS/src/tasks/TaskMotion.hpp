@@ -6,6 +6,7 @@
 
 #include "services/MotionService.hpp"
 #include "drivers/ServoManager.hpp"
+#include "core/TaskHeartbeat.hpp"
 
 namespace Services { class WatchdogManager; }
 
@@ -28,7 +29,8 @@ namespace Tasks
             Services::MotionService& motionService,
             Drivers::ServoManager& servoManager,
             QueueHandle_t commandQueue,
-            const TaskMotionConfig& config = TaskMotionConfig{}
+            const TaskMotionConfig& config = TaskMotionConfig{},
+            Core::TaskHeartbeat* heartbeat = nullptr
         );
 
         // Inyección opcional del watchdog para alimentación periódica.
@@ -44,6 +46,7 @@ namespace Tasks
         static void taskEntry(void* arg);
         void run();
 
+<<<<<<< HEAD
         Services::MotionService&   motion_;
         Drivers::ServoManager&     servos_;
         QueueHandle_t              queue_;
@@ -51,5 +54,14 @@ namespace Tasks
         Services::WatchdogManager* watchdog_ { nullptr };
         TaskHandle_t               handle_   { nullptr };
         volatile bool              running_  { false };
+=======
+        Services::MotionService& motion_;
+        Drivers::ServoManager&   servos_;
+        QueueHandle_t            queue_;
+        TaskMotionConfig         config_;
+        Core::TaskHeartbeat*     heartbeat_ { nullptr };
+        TaskHandle_t             handle_ { nullptr };
+        volatile bool            running_ { false };
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
     };
 }

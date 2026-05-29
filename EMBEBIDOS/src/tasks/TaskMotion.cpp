@@ -12,12 +12,14 @@ namespace Tasks
         Services::MotionService& motionService,
         Drivers::ServoManager& servoManager,
         QueueHandle_t commandQueue,
-        const TaskMotionConfig& config
+        const TaskMotionConfig& config,
+        Core::TaskHeartbeat* heartbeat
     )
         : motion_(motionService),
           servos_(servoManager),
           queue_(commandQueue),
-          config_(config)
+          config_(config),
+          heartbeat_(heartbeat)
     {
     }
 
@@ -101,9 +103,16 @@ namespace Tasks
 
             servos_.tick(now);
 
+<<<<<<< HEAD
             if (wdtAvailable)
             {
                 watchdog_->feed();
+=======
+            // 3) NUEVO en Etapa 9: patear el heartbeat para SafetyMonitor
+            if (heartbeat_ != nullptr)
+            {
+                heartbeat_->kick();
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
             }
 
             vTaskDelayUntil(&lastWake, period);

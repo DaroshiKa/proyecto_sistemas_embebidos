@@ -15,10 +15,15 @@
 #include "services/ConfigService.hpp"
 #include "services/CalibrationManager.hpp"
 
+// Forward declaration para evitar incluir SafetyService aquí
+// (rompería ciclos si en algún momento Safety incluye algo del CLI).
+namespace Services { class SafetyService; }
+
 namespace Services
 {
     // Dependencias necesarias para que el CLI pueda diagnosticar
     // y emitir comandos. Inyección opcional (nullptr = capacidad ausente).
+<<<<<<< HEAD
   struct CLIDependencies
 {
     Interfaces::ICommandDispatcher*  dispatcher       { nullptr };
@@ -31,6 +36,18 @@ namespace Services
     Services::CalibrationManager*    calibrationMgr   { nullptr };   // NUEVO
     Interfaces::IDiagnosticsProvider* diagnostics     { nullptr };
 };
+=======
+    struct CLIDependencies
+    {
+        Interfaces::ICommandDispatcher*  dispatcher       { nullptr };
+        Interfaces::IIMUSource*          imu              { nullptr };
+        Interfaces::IEMGSource*          emg              { nullptr };
+        Interfaces::IMotionExecutor*     executor         { nullptr };
+        Core::CommandDispatcher*         dispatcherStats  { nullptr };
+        Services::SafetyService*         safety           { nullptr };  // NUEVO en Etapa 9
+    };
+
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
     class CLIService
     {
     public:
@@ -88,6 +105,7 @@ namespace Services
         const char* gestureStr(Models::EMGGesture g) const;
         const char* imuStateStr(Models::IMUState s) const;
         const char* emgStateStr(Models::EMGState s) const;
+        const char* systemStateStr(Models::SystemState s) const;  // NUEVO en Etapa 9
 
         Communication::UARTConsole& console_;
         CLIDependencies             deps_;
