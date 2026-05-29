@@ -17,7 +17,7 @@ namespace Drivers
     static constexpr uint8_t REG_PWR_MGMT_1   = 0x6B;
     static constexpr uint8_t REG_WHO_AM_I     = 0x75;
 
-    static constexpr uint8_t WHO_AM_I_VALUE   = 0x68;
+    static constexpr uint8_t WHO_AM_I_VALUE   = 0x72;
 
     MPU6050Driver::MPU6050Driver(
         HAL::I2CHal& i2cHal

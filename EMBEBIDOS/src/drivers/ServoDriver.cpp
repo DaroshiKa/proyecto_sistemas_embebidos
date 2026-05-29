@@ -2,13 +2,14 @@
 
 namespace Drivers
 {
-    static constexpr uint32_t MIN_PULSE = 1638;   // ~1.0 ms a 50 Hz, 16 bits
-    static constexpr uint32_t MAX_PULSE = 8192;   // ~2.0 ms
+    static constexpr uint32_t MIN_PULSE = 3277;   // 1.0 ms → 0°
+    static constexpr uint32_t MAX_PULSE = 6554;   // 2.0 ms → 180°
 
     ServoDriver::ServoDriver(HAL::PWMHal& pwmHal)
         : pwmHal_(pwmHal),
           channel_(LEDC_CHANNEL_0)
     {
+        
     }
 
     bool ServoDriver::attach(gpio_num_t pin, ledc_channel_t channel)
