@@ -1,7 +1,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
+#include "tasks/TaskDiagnostics.hpp"
 #include "hal/I2CHal.hpp"
 #include "hal/ADCHal.hpp"
 #include "hal/PWMHal.hpp"
@@ -227,9 +227,25 @@ extern "C" void app_main(void)
 
     static Services::CLIService cliService(console, cliDeps);
     static App::DemoMode        demoMode(dispatcher);
+// =========================================================
+    // 7.5) Diagnostics (creado ANTES del CLI para que CLI lo vea)
+    // =========================================================
+    Tasks::TaskDiagnostics::Dependencies diagDeps {};
+    diagDeps.safetyMonitor   = &safetyService;
+    diagDeps.dispatcherStats = &dispatcher;
+    diagDeps.imuSvc          = imuOk ? &imuService : nullptr;
+    diagDeps.emgSvc          = emgOk ? &emgService : nullptr;
+
+    static Tasks::TaskDiagnostics taskDiag(diagDeps);
 
     // =========================================================
-    // 8) Tasks
+    // 8) CLI (con todas sus dependencias listas)
+    // =========================================================
+    cliDeps.diagnostics = &taskDiag;
+
+
+    // =========================================================
+    // 9) Tasks
     // =========================================================
     static Tasks::TaskMotion taskMotion(
         motionService, servoManager,
@@ -243,22 +259,69 @@ extern "C" void app_main(void)
     static Tasks::TaskEMG           taskEmg(emgService);
     static Tasks::TaskSystemMonitor taskSysMon(safetyService);
 
-    // Iniciar Safety primero — debe estar listo antes que nadie mueva nada
-    taskSafety.start();
+    // ---- Arrancar Safety primero ----
+    if (!taskSafety.start())
+    {
+        ESP_LOGE(TAG, "TaskSafety start failed → aborting boot");
+        safetyService.triggerEmergencyStop(
+            Models::SafetyFault::INIT_FAILURE);
+    }
+
     taskMotion.start();
     taskCli.start();
 
     if (imuOk) taskImu.start();
     if (emgOk) taskEmg.start();
 
-    // Registrar tasks críticas en el monitor
-    taskSysMon.registerWatchedTask(taskMotion.handle(), "Motion");
+    // ---- Registrar TODAS las tasks críticas en SystemMonitor ----
+    taskSysMon.registerWatchedTask(taskMotion.handle(),  "Motion");
+    taskSysMon.registerWatchedTask(taskSafety.handle(),  "Safety");
+    taskSysMon.registerWatchedTask(taskCli.handle(),     "CLI");
+    if (imuOk) taskSysMon.registerWatchedTask(taskImu.handle(), "IMU");
+    if (emgOk) taskSysMon.registerWatchedTask(taskEmg.handle(), "EMG");
     taskSysMon.start();
 
-    ESP_LOGI(TAG, "Boot complete. Safety active.");
+    // ---- Mismas tasks en Diagnostics ----
+    taskDiag.addWatchedTask(taskMotion.handle(), "Motion");
+    taskDiag.addWatchedTask(taskSafety.handle(), "Safety");
+    taskDiag.addWatchedTask(taskCli.handle(),    "CLI");
+    if (imuOk) taskDiag.addWatchedTask(taskImu.handle(), "IMU");
+    if (emgOk) taskDiag.addWatchedTask(taskEmg.handle(), "EMG");
 
+    taskDiag.start();
+
+    // ---- Boot final ----
+    if (!servoManager.initialize() ? false : true)
+    {
+        // (placeholder: servos ya inicializaron arriba; aquí sólo logueamos)
+    }
+
+    if (!imuOk || !emgOk)
+    {
+        ESP_LOGW(TAG, "Boot complete with DEGRADED sensors (imu=%s emg=%s)",
+                 imuOk ? "OK" : "down",
+                 emgOk ? "OK" : "down");
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Boot complete. All systems nominal.");
+    }
+
+    // =========================================================
+    // 10) Main loop: solo idle. Todo el trabajo real está en tasks.
+    //     Verificamos esporádicamente la salud del bootstrap.
+    // =========================================================
     while (true)
     {
-        vTaskDelay(pdMS_TO_TICKS(10000));
+        vTaskDelay(pdMS_TO_TICKS(30000));   // 30 s — no hace nada útil
+
+        // Sanidad mínima: si Safety está FATAL, no hay nada que hacer.
+        const auto st = safetyService.getStatus();
+        if (st.state == Models::SafetyState::FATAL)
+        {
+            ESP_LOGE(TAG, "FATAL safety state → halting main loop");
+            // Mantenemos la task viva para que el watchdog del bootloader
+            // siga teniendo este símbolo; las tasks RTOS siguen corriendo.
+        }
     }
 }

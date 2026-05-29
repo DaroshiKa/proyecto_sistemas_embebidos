@@ -54,6 +54,11 @@ namespace Services
         ) override;
         bool requestRecovery() override;
         void clearLatchedFaults() override;
+        // Bloqueo manual del operador. Mientras esté activo, NINGÚN comando
+        // de movimiento se permite (excepto EMERGENCY_STOP). No cambia la
+        // FSM ni levanta faltas: es un override del usuario.
+        void setUserLock(bool locked);
+        bool isUserLocked() const;
 
         // Registro de sensor-health providers (DI manual).
         // Devuelve false si ya no hay slots.
@@ -85,7 +90,8 @@ namespace Services
             Models::SafetyFault fault,
             uint32_t nowMs
         );
-
+        
+        volatile bool userLocked_ { false };
         // Decisión periódica del estado a partir de las faltas
         Models::SafetyState decideTargetState() const;
 

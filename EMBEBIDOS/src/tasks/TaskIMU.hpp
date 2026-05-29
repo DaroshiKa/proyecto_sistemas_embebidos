@@ -29,6 +29,7 @@ namespace Tasks
         void stop();
 
         bool isRunning() const { return handle_ != nullptr; }
+        TaskHandle_t handle() const { return handle_; }
 
     private:
         static void taskEntry(void* arg);

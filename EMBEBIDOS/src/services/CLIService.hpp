@@ -2,7 +2,7 @@
 
 #include "communication/CommandParser.hpp"
 #include "communication/UARTConsole.hpp"
-
+#include "interfaces/IDiagnosticsProvider.hpp"
 #include "interfaces/ICommandDispatcher.hpp"
 #include "interfaces/IIMUSource.hpp"
 #include "interfaces/IEMGSource.hpp"
@@ -29,6 +29,7 @@ namespace Services
     Interfaces::ISafetyMonitor*      safetyMonitor    { nullptr };
     Interfaces::IConfigService*      configService    { nullptr };   // NUEVO
     Services::CalibrationManager*    calibrationMgr   { nullptr };   // NUEVO
+    Interfaces::IDiagnosticsProvider* diagnostics     { nullptr };
 };
     class CLIService
     {
@@ -42,7 +43,7 @@ namespace Services
         void cmdCal(const Communication::ParsedCommand& p);
         // Procesa una línea recibida del usuario.
         void handleLine(const char* line);
-
+        
         // Imprime el prompt
         void printPrompt();
 
@@ -64,7 +65,9 @@ namespace Services
         void cmdSafety(const Communication::ParsedCommand& p);
         void cmdEmergencyStop();
         void cmdDemo(const Communication::ParsedCommand& p);
-
+        void cmdDiag(const Communication::ParsedCommand& p);
+        void cmdSetHome(const Communication::ParsedCommand& p);
+        void cmdLock(const Communication::ParsedCommand& p);
         // Helpers de dispatch
         bool dispatchMotion(
             Models::MotionType type,

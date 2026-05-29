@@ -1,12 +1,12 @@
 #include "services/CLIService.hpp"
 
 #include <cstring>
-
+#include "services/SafetyService.hpp"
 #include "esp_system.h"
 #include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-
+#include "interfaces/IDiagnosticsProvider.hpp"
 #include "models/SafetyState.hpp"
 
 namespace Services
@@ -51,6 +51,10 @@ namespace Services
             // Línea vacía o comentario: re-imprime prompt
             return;
         }
+        else if (Communication::CommandParser::equals(p.verb, "sethome"))
+        {
+            cmdSetHome(p);
+        }
         else if (Communication::CommandParser::equals(p.verb, "config"))
         {
             cmdConfig(p);
@@ -58,6 +62,14 @@ namespace Services
         else if (Communication::CommandParser::equals(p.verb, "cal"))
         {
             cmdCal(p);
+        }
+        else if (Communication::CommandParser::equals(p.verb, "lock"))
+        {
+            cmdLock(p);
+        }
+        else if (Communication::CommandParser::equals(p.verb, "diag"))
+        {
+            cmdDiag(p);
         }
 
         using namespace Communication;
@@ -103,6 +115,7 @@ namespace Services
         console_.writeLine("  safety status | reset | clear");
         console_.writeLine("  emergency_stop");
         console_.writeLine("  demo start | stop");
+        console_.writeLine("  diag show | tasks | heap | dispatch");
     }
 
     // ==================================================================
@@ -509,8 +522,8 @@ namespace Services
         }
 
         console_.writeLine("");
-        console_.writeLine("ID  Name     cur     tgt     moving");
-        console_.writeLine("----------------------------------------");
+        console_.writeLine("ID  Name     cur     tgt     speed   planned  moving");
+        console_.writeLine("---------------------------------------------------------");
 
         static const char* names[] = { "hand", "wrist", "elbowX", "elbowY", "elbowZ" };
 
@@ -523,11 +536,13 @@ namespace Services
                     static_cast<Models::JointId>(i), st))
             {
                 console_.printf(
-                    "%u   %-7s  %6.1f  %6.1f  %s\r\n",
+                    "%u   %-7s  %6.1f  %6.1f  %6.1f   %6.1f   %s\r\n",
                     static_cast<unsigned>(i),
                     names[i],
                     st.currentAngle,
                     st.targetAngle,
+                    st.currentSpeedDps,    // velocidad instantánea medida
+                    st.plannedSpeedDps,    // velocidad comandada
                     st.moving ? "YES" : "no"
                 );
             }
@@ -882,6 +897,200 @@ namespace Services
         else
         {
             console_.writeLine("ERR: cal show | save | load | reset");
+        }
+    }
+    // ==================================================================
+    // DIAG — diagnóstico del sistema (Etapa 11)
+    //   diag show     -> resumen general
+    //   diag tasks    -> stack high-water mark de cada task vigilada
+    //   diag heap     -> métricas detalladas de heap
+    //   diag dispatch -> contadores del dispatcher
+    // ==================================================================
+    void CLIService::cmdDiag(const Communication::ParsedCommand& p)
+    {
+        if (deps_.diagnostics == nullptr)
+        {
+            console_.writeLine("ERR: diagnostics not available");
+            return;
+        }
+
+        const auto s = deps_.diagnostics->snapshot();
+
+        if (Communication::CommandParser::equals(p.subverb, "show") ||
+            p.subverb[0] == '\0')
+        {
+            console_.writeLine("");
+            console_.writeLine("--- Diagnostics ---");
+            console_.printf("  uptime          : %lu s\r\n",
+                            static_cast<unsigned long>(s.uptimeMs / 1000));
+            console_.printf("  heap free       : %lu bytes\r\n",
+                            static_cast<unsigned long>(s.freeHeapBytes));
+            console_.printf("  heap min ever   : %lu bytes\r\n",
+                            static_cast<unsigned long>(s.minFreeHeapBytes));
+            console_.printf("  largest block   : %lu bytes\r\n",
+                            static_cast<unsigned long>(s.largestBlockBytes));
+            console_.printf("  safety state    : 0x%02X\r\n",
+                            static_cast<unsigned>(s.safetyState));
+            console_.printf("  active faults   : 0x%04X\r\n",
+                            static_cast<unsigned>(s.activeFaults));
+            console_.printf("  latched faults  : 0x%04X\r\n",
+                            static_cast<unsigned>(s.latchedFaults));
+            console_.printf("  e-stops total   : %lu\r\n",
+                            static_cast<unsigned long>(s.totalEmergencyStops));
+            console_.printf("  recoveries      : %lu\r\n",
+                            static_cast<unsigned long>(s.totalRecoveries));
+            console_.printf("  dispatched/rej/drop : %lu / %lu / %lu\r\n",
+                            static_cast<unsigned long>(s.dispatched),
+                            static_cast<unsigned long>(s.rejected),
+                            static_cast<unsigned long>(s.dropped));
+            console_.printf("  imu samples     : %lu (%s)\r\n",
+                            static_cast<unsigned long>(s.imuTotalSamples),
+                            s.imuHealthy ? "OK" : "down");
+            console_.printf("  emg samples     : %lu (%s)\r\n",
+                            static_cast<unsigned long>(s.emgTotalSamples),
+                            s.emgHealthy ? "OK" : "down");
+            console_.printf("  tasks watched   : %u (min HWM=%lu words)\r\n",
+                            static_cast<unsigned>(s.taskCount),
+                            static_cast<unsigned long>(s.minStackHighWater));
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "tasks"))
+        {
+            console_.writeLine("");
+            console_.writeLine("Task            HWM(words)  alive");
+            console_.writeLine("---------------------------------");
+            for (size_t i = 0; i < s.taskCount; ++i)
+            {
+                const auto& t = s.tasks[i];
+                console_.printf("  %-12s  %8lu     %s\r\n",
+                    (t.name != nullptr) ? t.name : "?",
+                    static_cast<unsigned long>(t.stackHighWater),
+                    t.alive ? "Y" : "n");
+            }
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "heap"))
+        {
+            console_.writeLine("");
+            console_.printf("free=%lu  min_ever=%lu  largest_block=%lu\r\n",
+                static_cast<unsigned long>(s.freeHeapBytes),
+                static_cast<unsigned long>(s.minFreeHeapBytes),
+                static_cast<unsigned long>(s.largestBlockBytes));
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "dispatch"))
+        {
+            console_.writeLine("");
+            console_.printf("dispatched=%lu  rejected=%lu  dropped=%lu\r\n",
+                static_cast<unsigned long>(s.dispatched),
+                static_cast<unsigned long>(s.rejected),
+                static_cast<unsigned long>(s.dropped));
+        }
+        else
+        {
+            console_.writeLine("ERR: diag show | tasks | heap | dispatch");
+        }
+    }
+    void CLIService::cmdSetHome(const Communication::ParsedCommand& p)
+    {
+        if (deps_.configService == nullptr)
+        {
+            console_.writeLine("ERR: ConfigService not available");
+            return;
+        }
+
+        int   id    = -1;
+        float angle = 0.0f;
+
+        // p.subverb = id, p.args[0] = angle, p.args[1] = "save" (opcional)
+        if (!Communication::CommandParser::argToInt(p.subverb, id))
+        {
+            console_.writeLine("Uso: sethome <id> <angle> [save]");
+            console_.writeLine("  id: 0=hand 1=wrist 2=elbowX 3=elbowY 4=elbowZ");
+            return;
+        }
+        if (p.argCount < 1 ||
+            !Communication::CommandParser::argToFloat(p.args[0], angle))
+        {
+            console_.writeLine("ERR: falta el angulo");
+            return;
+        }
+        if (id < 0 || id >= static_cast<int>(Models::JointId::COUNT))
+        {
+            console_.writeLine("ERR: id fuera de rango (0..4)");
+            return;
+        }
+        if (angle < 0.0f || angle > 180.0f)
+        {
+            console_.writeLine("ERR: angulo debe estar entre 0 y 180");
+            return;
+        }
+
+        // Modificar la config en memoria
+        auto cfg = deps_.configService->snapshot();
+        cfg.motion.homeAngles[id] = angle;
+
+        if (!deps_.configService->apply(cfg))
+        {
+            console_.writeLine("ERR: apply fallo");
+            return;
+        }
+
+        console_.printf("OK: home del servo %d cambiado a %.1f deg\r\n",
+                        id, angle);
+
+        // Si pasó "save" como segundo argumento, persiste a NVS
+        if (p.argCount >= 2 &&
+            Communication::CommandParser::equals(p.args[1], "save"))
+        {
+            if (deps_.configService->save())
+                console_.writeLine("OK: guardado en NVS (sobrevive reset)");
+            else
+                console_.writeLine("WARN: no se pudo guardar en NVS");
+        }
+        else
+        {
+            console_.writeLine("INFO: usa 'sethome <id> <angle> save' o 'config save' para persistir");
+        }
+
+        console_.writeLine("INFO: ejecuta 'home' para mover los servos ahora");
+    }
+    // ==================================================================
+    // LOCK — bloqueo manual de movimientos
+    //   lock on    -> bloquea servos (E-STOP solo sigue disponible)
+    //   lock off   -> libera el bloqueo
+    //   lock       -> muestra el estado actual
+    // ==================================================================
+    void CLIService::cmdLock(const Communication::ParsedCommand& p)
+    {
+        if (deps_.safetyMonitor == nullptr)
+        {
+            console_.writeLine("ERR: SafetyMonitor not available");
+            return;
+        }
+
+        // Casteamos a SafetyService (impl concreta) para acceder a setUserLock().
+        // El CLI sí puede conocer el tipo concreto; la abstracción es para Motion.
+        auto* svc = static_cast<Services::SafetyService*>(deps_.safetyMonitor);
+
+        if (Communication::CommandParser::equals(p.subverb, "on"))
+        {
+            svc->setUserLock(true);
+            console_.writeLine("OK: motion LOCKED. emergency_stop still works.");
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "off"))
+        {
+            svc->setUserLock(false);
+            console_.writeLine("OK: motion UNLOCKED.");
+        }
+        else if (p.subverb[0] == '\0' ||
+                 Communication::CommandParser::equals(p.subverb, "status"))
+        {
+            console_.printf(
+                "Lock state: %s\r\n",
+                svc->isUserLocked() ? "LOCKED" : "unlocked"
+            );
+        }
+        else
+        {
+            console_.writeLine("ERR: lock on | off | status");
         }
     }
 }

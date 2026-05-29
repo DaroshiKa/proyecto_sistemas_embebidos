@@ -48,5 +48,11 @@ namespace Models
         bool     moving          { false };
         bool     fault           { false };
         ServoMotionProfile profile { ServoMotionProfile::SMOOTHSTEP };
+
+        // ⬇⬇⬇ NUEVOS CAMPOS ⬇⬇⬇
+        float    currentSpeedDps { 0.0f };   // velocidad instantánea medida
+        float    plannedSpeedDps { 0.0f };   // velocidad pedida al startMove
+        float    lastAngleSnap   { 0.0f };   // helper interno para derivada
+        uint32_t lastTickMs      { 0 };      // helper interno para derivada
     };
 }

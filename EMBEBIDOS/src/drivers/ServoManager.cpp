@@ -136,12 +136,16 @@ namespace Drivers
 
         if (xSemaphoreTake(stateMutex_, pdMS_TO_TICKS(2)) == pdTRUE)
         {
-            states_[i].startAngle  = current;
-            states_[i].targetAngle = clampedTarget;
-            states_[i].startTimeMs = nowMs;
-            states_[i].durationMs  = interpolators_[i].plannedDurationMs();
-            states_[i].moving      = true;
-            states_[i].profile     = profile;
+            states_[i].startAngle      = current;
+            states_[i].targetAngle     = clampedTarget;
+            states_[i].startTimeMs     = nowMs;
+            states_[i].durationMs      = interpolators_[i].plannedDurationMs();
+            states_[i].moving          = true;
+            states_[i].profile         = profile;
+            states_[i].plannedSpeedDps = speedDps;          // NUEVO
+            states_[i].lastAngleSnap   = current;           // NUEVO
+            states_[i].lastTickMs      = nowMs;             // NUEVO
+            states_[i].currentSpeedDps = 0.0f;              // NUEVO
             xSemaphoreGive(stateMutex_);
         }
     }
@@ -308,6 +312,15 @@ namespace Drivers
         {
             if (!interpolators_[i].isActive())
             {
+                // Servo detenido: forzar velocidad a 0
+                if (states_[i].currentSpeedDps != 0.0f)
+                {
+                    if (xSemaphoreTake(stateMutex_, pdMS_TO_TICKS(2)) == pdTRUE)
+                    {
+                        states_[i].currentSpeedDps = 0.0f;
+                        xSemaphoreGive(stateMutex_);
+                    }
+                }
                 continue;
             }
 
@@ -316,16 +329,43 @@ namespace Drivers
 
             applyAngle(static_cast<Models::JointId>(i), angle);
 
+            // ---- Cálculo de velocidad instantánea ----
+            // dt mínimo: si tick fue muy rápido, evitar división por 0.
+            if (xSemaphoreTake(stateMutex_, pdMS_TO_TICKS(2)) == pdTRUE)
+            {
+                const uint32_t dtMs = nowMs - states_[i].lastTickMs;
+                if (dtMs > 0)
+                {
+                    const float dAngle =
+                        angle - states_[i].lastAngleSnap;
+
+                    // |dAngle/dt| convertido a °/s
+                    float speed = (dAngle * 1000.0f) /
+                                  static_cast<float>(dtMs);
+                    if (speed < 0.0f) speed = -speed;   // valor absoluto
+
+                    // Filtro suave (EWMA, alpha=0.3) para evitar jitter
+                    states_[i].currentSpeedDps =
+                        0.7f * states_[i].currentSpeedDps + 0.3f * speed;
+
+                    states_[i].lastAngleSnap = angle;
+                    states_[i].lastTickMs    = nowMs;
+                }
+                xSemaphoreGive(stateMutex_);
+            }
+
             if (done)
             {
                 interpolators_[i].abort(angle);
 
                 if (xSemaphoreTake(stateMutex_, pdMS_TO_TICKS(2)) == pdTRUE)
                 {
-                    states_[i].moving = false;
+                    states_[i].moving          = false;
+                    states_[i].currentSpeedDps = 0.0f;   // se detuvo
                     xSemaphoreGive(stateMutex_);
                 }
             }
         }
     }
-}
+
+} 

@@ -158,6 +158,13 @@ namespace Services
             return true;
         }
 
+        // Regla 0.5: lockout manual del usuario.
+        // El operador presionó "lock": rechazar todo movimiento.
+        // EMERGENCY_STOP ya pasó en la regla 0, así que sigue funcionando.
+        if (userLocked_)
+        {
+            return false;
+        }
         // Regla 1: FATAL = nada se permite
         if (state == Models::SafetyState::FATAL)
         {
@@ -651,5 +658,29 @@ namespace Services
         evt.timestampMs = nowMs;
         evt.data        = data;
         eventBus_.publish(evt);
+    }
+    // ----------------------------------------------------------------------
+    // User-controlled lockout (bloqueo manual)
+    // ----------------------------------------------------------------------
+
+    void SafetyService::setUserLock(bool locked)
+    {
+        userLocked_ = locked;
+
+        if (locked)
+        {
+            // Si bloqueamos, paramos lo que esté en movimiento.
+            motionExecutor_.stopAll();
+            ESP_LOGW(TAG, "User LOCK engaged - motion disabled");
+        }
+        else
+        {
+            ESP_LOGI(TAG, "User LOCK released - motion enabled");
+        }
+    }
+
+    bool SafetyService::isUserLocked() const
+    {
+        return userLocked_;
     }
 }
