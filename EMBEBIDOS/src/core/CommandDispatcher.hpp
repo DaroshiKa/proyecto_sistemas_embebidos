@@ -8,6 +8,9 @@
 
 #include "core/EventBus.hpp"
 
+// Forward declaration; mantenemos el header limpio
+namespace Services { class SafetyService; }
+
 namespace Core
 {
     class CommandDispatcher final :
@@ -24,7 +27,9 @@ namespace Core
             const Models::MotionCommand& command
         ) override;
 
-        // Stats para diagnóstico
+        // Inyección opcional para reportar queue drops al sistema de seguridad
+        void attachSafetyService(Services::SafetyService* safety);
+
         uint32_t totalDispatched() const { return totalDispatched_; }
         uint32_t totalRejected()   const { return totalRejected_; }
         uint32_t totalDropped()    const { return totalDropped_; }
@@ -33,6 +38,7 @@ namespace Core
         Interfaces::ISafetyValidator& validator_;
         QueueHandle_t                 outputQueue_;
         EventBus*                     eventBus_;
+        Services::SafetyService*      safety_ { nullptr };
 
         uint32_t totalDispatched_ { 0 };
         uint32_t totalRejected_   { 0 };

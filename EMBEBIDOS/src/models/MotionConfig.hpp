@@ -31,4 +31,4 @@ namespace Models
         // Periodo del control loop
         uint32_t controlLoopPeriodMs    { 10 };   // 100 Hz
     };
-}
+} 

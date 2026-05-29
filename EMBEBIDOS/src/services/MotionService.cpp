@@ -3,9 +3,16 @@
 #include "esp_log.h"
 #include "esp_timer.h"
 
+#include "interfaces/ISafetyMonitor.hpp"
+#include "models/SafetyFault.hpp"
+
 namespace Services
 {
     static constexpr const char* TAG = "MotionService";
+
+    // ------------------------------------------------------------------
+    // Construcción / ciclo de vida
+    // ------------------------------------------------------------------
 
     MotionService::MotionService(
         Interfaces::IMotionExecutor& executor,
@@ -30,6 +37,25 @@ namespace Services
         // Este update() existe sólo por contrato IService.
     }
 
+    // ------------------------------------------------------------------
+    // Inyección tardía: SafetyMonitor (Etapa 9)
+    //
+    // Si está presente, los EMERGENCY_STOP se reportan al monitor para
+    // que entre en EMERGENCY_STOP_HOLD y latche la falta. Sin monitor,
+    // el servicio sigue siendo operativo (modo standalone para test).
+    // ------------------------------------------------------------------
+
+    void MotionService::attachSafetyMonitor(
+        Interfaces::ISafetyMonitor* monitor
+    )
+    {
+        safetyMonitor_ = monitor;
+    }
+
+    // ------------------------------------------------------------------
+    // Procesamiento de comando high-level
+    // ------------------------------------------------------------------
+
     bool MotionService::processMotionCommand(
         const Models::MotionCommand& command,
         uint32_t nowMs
@@ -40,7 +66,9 @@ namespace Services
         switch (command.type)
         {
             case Models::MotionType::EMERGENCY_STOP:
-                ok = dispatchEmergencyStop();
+                // Etapa 9: ahora pasamos el command para que el dispatch
+                // pueda incluirlo en el evento y auditoría.
+                ok = dispatchEmergencyStop(command);
                 break;
 
             case Models::MotionType::HAND_OPEN:
@@ -96,6 +124,10 @@ namespace Services
         return ok;
     }
 
+    // ------------------------------------------------------------------
+    // Publicación del evento de ejecución
+    // ------------------------------------------------------------------
+
     void MotionService::publishExecuted(
         const Models::MotionCommand& cmd,
         uint32_t now
@@ -108,7 +140,9 @@ namespace Services
         eventBus_.publish(evt);
     }
 
-    // --- Movimientos discretos ---
+    // ==================================================================
+    // Movimientos discretos
+    // ==================================================================
 
     bool MotionService::dispatchHandOpen(uint32_t now)
     {
@@ -230,21 +264,61 @@ namespace Services
         Models::ServoCommand c {};
         c.jointId     = static_cast<Models::JointId>(cmd.targetServo);
         c.targetAngle = cmd.targetAngle;
-        c.speedDps    = (cmd.speed > 0.0f) ? cmd.speed : config_.defaultSpeedDps;
+        c.speedDps    = (cmd.speed > 0.0f) ?
+                        cmd.speed : config_.defaultSpeedDps;
         c.profile     = Models::ServoMotionProfile::SMOOTHSTEP;
         c.timestampMs = now;
         return executor_.executeServoCommand(c);
     }
 
-    bool MotionService::dispatchEmergencyStop()
+    // ==================================================================
+    // Emergency Stop  (actualizado en Etapa 9)
+    //
+    // Pasos:
+    //  1) PARADA INMEDIATA de actuadores. Esta acción NO debe
+    //     bloquearse esperando al SafetyMonitor: es la operación
+    //     más crítica del sistema y debe ejecutarse incluso si el
+    //     monitor está deadlocked o ausente.
+    //
+    //  2) Si SafetyMonitor está presente, le notificamos para que
+    //     entre en EMERGENCY_STOP_HOLD, latche la falta y publique
+    //     EMERGENCY_TRIGGERED en el EventBus (evita duplicar la
+    //     publicación del evento desde aquí).
+    //
+    //  3) Si no hay SafetyMonitor (modo standalone / test sin Etapa 9),
+    //     publicamos directamente al EventBus para conservar la
+    //     compatibilidad con la conducta de la Etapa 6.
+    // ==================================================================
+
+    bool MotionService::dispatchEmergencyStop(
+        const Models::MotionCommand& cmd
+    )
     {
+        // 1) Parada inmediata, sin condiciones.
         executor_.stopAll();
 
-        Models::EventMessage evt {};
-        evt.type        = Models::EventType::EMERGENCY_TRIGGERED;
-        evt.timestampMs = static_cast<uint32_t>(
-            esp_timer_get_time() / 1000ULL);
-        eventBus_.publish(evt);
+        ESP_LOGW(TAG,
+                 "EMERGENCY_STOP executed (source=%u, ts=%lu ms)",
+                 static_cast<unsigned>(cmd.source),
+                 static_cast<unsigned long>(cmd.timestampMs));
+
+        if (safetyMonitor_ != nullptr)
+        {
+            // 2) El monitor latch-ea el estado y publica EMERGENCY_TRIGGERED.
+            //    No publicamos el evento desde aquí para no duplicarlo.
+            safetyMonitor_->triggerEmergencyStop(
+                Models::SafetyFault::USER_REQUESTED_ESTOP
+            );
+        }
+        else
+        {
+            // 3) Fallback (sin monitor): publicamos directo
+            Models::EventMessage evt {};
+            evt.type        = Models::EventType::EMERGENCY_TRIGGERED;
+            evt.timestampMs = static_cast<uint32_t>(
+                esp_timer_get_time() / 1000ULL);
+            eventBus_.publish(evt);
+        }
 
         return true;
     }

@@ -1,4 +1,5 @@
 #include "tasks/TaskMotion.hpp"
+#include "services/WatchdogManager.hpp"
 
 #include "esp_log.h"
 #include "esp_timer.h"
@@ -20,6 +21,11 @@ namespace Tasks
           config_(config),
           heartbeat_(heartbeat)
     {
+    }
+
+    void TaskMotion::attachWatchdog(Services::WatchdogManager* wdt)
+    {
+        watchdog_ = wdt;
     }
 
     bool TaskMotion::start()
@@ -51,13 +57,6 @@ namespace Tasks
             return false;
         }
 
-        ESP_LOGI(
-            TAG,
-            "Started on core %d, period %lu ms, priority %u",
-            static_cast<int>(config_.coreId),
-            static_cast<unsigned long>(config_.periodMs),
-            static_cast<unsigned>(config_.priority)
-        );
         return true;
     }
 
@@ -78,7 +77,17 @@ namespace Tasks
 
     void TaskMotion::run()
     {
-        TickType_t lastWake = xTaskGetTickCount();
+        const bool wdtAvailable =
+            config_.useWatchdog &&
+            watchdog_ != nullptr &&
+            watchdog_->isInitialized();
+
+        if (wdtAvailable)
+        {
+            watchdog_->subscribeCurrentTask();
+        }
+
+        TickType_t lastWake     = xTaskGetTickCount();
         const TickType_t period = pdMS_TO_TICKS(config_.periodMs);
 
         while (running_)
@@ -86,23 +95,32 @@ namespace Tasks
             const uint32_t now =
                 static_cast<uint32_t>(esp_timer_get_time() / 1000ULL);
 
-            // 1) Drenar TODOS los comandos pendientes (no esperar)
             Models::MotionCommand cmd {};
             while (xQueueReceive(queue_, &cmd, 0) == pdTRUE)
             {
                 motion_.processMotionCommand(cmd, now);
             }
 
-            // 2) Tick del bucle de control de servos (interpolación)
             servos_.tick(now);
 
+<<<<<<< HEAD
+            if (wdtAvailable)
+            {
+                watchdog_->feed();
+=======
             // 3) NUEVO en Etapa 9: patear el heartbeat para SafetyMonitor
             if (heartbeat_ != nullptr)
             {
                 heartbeat_->kick();
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
             }
 
             vTaskDelayUntil(&lastWake, period);
+        }
+
+        if (wdtAvailable)
+        {
+            watchdog_->unsubscribeCurrentTask();
         }
     }
 }

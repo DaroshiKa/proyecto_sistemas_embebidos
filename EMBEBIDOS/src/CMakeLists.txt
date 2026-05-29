@@ -1,7 +1,11 @@
-idf_component_register(
-    SRCS
-        "main.cpp"
+# 1. Buscar recursivamente todos los archivos .cpp y .c
+file(GLOB_RECURSE app_sources "*.cpp" "*.c")
 
+<<<<<<< HEAD
+# 2. Registrar el componente usando la lista generada
+idf_component_register(SRCS ${app_sources}
+                       INCLUDE_DIRS ".")
+=======
         "core/EventBus.cpp"
         "core/CommandDispatcher.cpp"
         "core/QueueManager.cpp"
@@ -58,3 +62,4 @@ idf_component_register(
     INCLUDE_DIRS
         "."
 )
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60

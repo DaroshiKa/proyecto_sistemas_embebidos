@@ -2,16 +2,18 @@
 
 #include "communication/CommandParser.hpp"
 #include "communication/UARTConsole.hpp"
-
+#include "interfaces/IDiagnosticsProvider.hpp"
 #include "interfaces/ICommandDispatcher.hpp"
 #include "interfaces/IIMUSource.hpp"
 #include "interfaces/IEMGSource.hpp"
 #include "interfaces/IMotionExecutor.hpp"
 
 #include "core/CommandDispatcher.hpp"
-
+#include "interfaces/ISafetyMonitor.hpp"
 #include "models/MotionCommand.hpp"
 #include "models/ServoState.hpp"
+#include "services/ConfigService.hpp"
+#include "services/CalibrationManager.hpp"
 
 // Forward declaration para evitar incluir SafetyService aquí
 // (rompería ciclos si en algún momento Safety incluye algo del CLI).
@@ -21,6 +23,20 @@ namespace Services
 {
     // Dependencias necesarias para que el CLI pueda diagnosticar
     // y emitir comandos. Inyección opcional (nullptr = capacidad ausente).
+<<<<<<< HEAD
+  struct CLIDependencies
+{
+    Interfaces::ICommandDispatcher*  dispatcher       { nullptr };
+    Interfaces::IIMUSource*          imu              { nullptr };
+    Interfaces::IEMGSource*          emg              { nullptr };
+    Interfaces::IMotionExecutor*     executor         { nullptr };
+    Core::CommandDispatcher*         dispatcherStats  { nullptr };
+    Interfaces::ISafetyMonitor*      safetyMonitor    { nullptr };
+    Interfaces::IConfigService*      configService    { nullptr };   // NUEVO
+    Services::CalibrationManager*    calibrationMgr   { nullptr };   // NUEVO
+    Interfaces::IDiagnosticsProvider* diagnostics     { nullptr };
+};
+=======
     struct CLIDependencies
     {
         Interfaces::ICommandDispatcher*  dispatcher       { nullptr };
@@ -31,6 +47,7 @@ namespace Services
         Services::SafetyService*         safety           { nullptr };  // NUEVO en Etapa 9
     };
 
+>>>>>>> 0f18090e8f7bddf39123306abf466af425290d60
     class CLIService
     {
     public:
@@ -39,9 +56,11 @@ namespace Services
             const CLIDependencies& deps
         );
 
+        void cmdConfig(const Communication::ParsedCommand& p);
+        void cmdCal(const Communication::ParsedCommand& p);
         // Procesa una línea recibida del usuario.
         void handleLine(const char* line);
-
+        
         // Imprime el prompt
         void printPrompt();
 
@@ -63,7 +82,9 @@ namespace Services
         void cmdSafety(const Communication::ParsedCommand& p);
         void cmdEmergencyStop();
         void cmdDemo(const Communication::ParsedCommand& p);
-
+        void cmdDiag(const Communication::ParsedCommand& p);
+        void cmdSetHome(const Communication::ParsedCommand& p);
+        void cmdLock(const Communication::ParsedCommand& p);
         // Helpers de dispatch
         bool dispatchMotion(
             Models::MotionType type,

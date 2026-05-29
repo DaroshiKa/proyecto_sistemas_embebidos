@@ -17,7 +17,7 @@ namespace Drivers
     static constexpr uint8_t REG_PWR_MGMT_1   = 0x6B;
     static constexpr uint8_t REG_WHO_AM_I     = 0x75;
 
-    static constexpr uint8_t WHO_AM_I_VALUE   = 0x68;
+    static constexpr uint8_t WHO_AM_I_VALUE   = 0x72;
 
     MPU6050Driver::MPU6050Driver(
         HAL::I2CHal& i2cHal
@@ -357,5 +357,33 @@ namespace Drivers
         );
 
         return true;
+    }
+
+    void MPU6050Driver::setManualOffsets(
+        float ax, float ay, float az,
+        float gx, float gy, float gz
+    )
+    {
+        offsetAx_ = ax;
+        offsetAy_ = ay;
+        offsetAz_ = az;
+        offsetGx_ = gx;
+        offsetGy_ = gy;
+        offsetGz_ = gz;
+        calibrated_ = true;
+        ESP_LOGI(
+            TAG,
+            "Offsets injected | A=[%.4f, %.4f, %.4f]g G=[%.3f, %.3f, %.3f]dps",
+            ax, ay, az, gx, gy, gz
+        );
+    }
+
+    void MPU6050Driver::getOffsets(
+        float& ax, float& ay, float& az,
+        float& gx, float& gy, float& gz
+    ) const
+    {
+        ax = offsetAx_; ay = offsetAy_; az = offsetAz_;
+        gx = offsetGx_; gy = offsetGy_; gz = offsetGz_;
     }
 }

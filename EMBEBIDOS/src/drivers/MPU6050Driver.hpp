@@ -74,6 +74,18 @@ namespace Drivers
             float& gz
         ) const;
 
+        // Inyecta offsets calibrados desde una fuente externa (ej: NVS).
+        // No realiza muestreo; sólo guarda y marca calibrated = true.
+        void setManualOffsets(
+            float ax, float ay, float az,
+            float gx, float gy, float gz
+        );
+
+        void getOffsets(
+            float& ax, float& ay, float& az,
+            float& gx, float& gy, float& gz
+        ) const;
+
     private:
         bool writeReg(
             uint8_t reg,

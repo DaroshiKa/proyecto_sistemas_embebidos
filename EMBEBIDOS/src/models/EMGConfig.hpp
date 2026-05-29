@@ -13,10 +13,9 @@ namespace Models
         adc_atten_t   adcAttenuation   { ADC_ATTEN_DB_12 }; // 0..3.1V
 
         // ----- Muestreo -----
-        uint32_t      sampleRateHz     { 1000 };
+        uint32_t      sampleRateHz     { 20000 };
         uint32_t      dmaBufferBytes   { 2048 };
-        uint32_t      dmaFrameBytes    { 256 };  // 128 muestras de 16 bits
-
+        uint32_t      dmaFrameBytes    { 256 };// 128 muestras de 16 bits
         // ----- Filtros (frecuencias en Hz) -----
         float         hpfCutoffHz      { 20.0f };
         float         lpfCutoffHz      { 450.0f };

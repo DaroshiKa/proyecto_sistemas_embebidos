@@ -298,4 +298,28 @@ namespace Services
         config_.thresholdOn  = onLevel;
         config_.thresholdOff = offLevel;
     }
-}
+
+    void EMGService::setCalibration(float baseline, float peak)
+    {
+        processor_.setBaseline(baseline);
+        processor_.setPeakNormalization(peak);
+
+        if (mutex_ != nullptr &&
+            xSemaphoreTake(mutex_, pdMS_TO_TICKS(10)) == pdTRUE)
+        {
+            status_.calibrated    = true;
+            status_.baselineLevel = baseline;
+            status_.peakLevel     = peak;
+            xSemaphoreGive(mutex_);
+        }
+        ESP_LOGI(TAG, "Calibration injected baseline=%.4f peak=%.4f",
+                 baseline, peak);
+    }
+
+    void EMGService::getCalibration(float& outBaseline, float& outPeak) const
+    {
+        outBaseline = status_.baselineLevel;
+        outPeak     = status_.peakLevel;
+    }
+
+} // Cierre del namespace Services
