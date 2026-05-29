@@ -48,12 +48,19 @@ namespace Services
 
         // Reconfiguración runtime (CLI / Nextion)
         void setThresholds(float onLevel, float offLevel);
+        // Inyecta baseline/peak ya conocidos (ej. cargados desde NVS).
+        // No ejecuta calibración bloqueante.
+        void setCalibration(float baseline, float peak);
+
+        // Lee los valores actuales que se aplicaron al procesador.
+        void getCalibration(float& outBaseline, float& outPeak) const;
 
     private:
         void processOneSample(uint16_t raw, uint32_t nowMs);
         void publishSensorUpdated();
         void emitMotionCommandIfGesture(Models::EMGGesture gesture, uint32_t nowMs);
         void setState(Models::EMGState state);
+        
 
         Drivers::EMGDriver&        driver_;
         Core::EventBus&            eventBus_;

@@ -51,6 +51,14 @@ namespace Services
             // Línea vacía o comentario: re-imprime prompt
             return;
         }
+        else if (Communication::CommandParser::equals(p.verb, "config"))
+        {
+            cmdConfig(p);
+        }
+        else if (Communication::CommandParser::equals(p.verb, "cal"))
+        {
+            cmdCal(p);
+        }
 
         using namespace Communication;
 
@@ -747,6 +755,133 @@ namespace Services
             case Models::EMGState::TIMEOUT:       return "TIMEOUT";
             case Models::EMGState::FAULT:         return "FAULT";
             default:                              return "?";
+        }
+    }
+    // ==================================================================
+    // CONFIG — persistencia de configuración (Etapa 10)
+    //   config show    -> imprime resumen
+    //   config save    -> persiste a NVS
+    //   config load    -> recarga desde NVS
+    //   config reset   -> defaults (no persiste hasta 'config save')
+    // ==================================================================
+    void CLIService::cmdConfig(const Communication::ParsedCommand& p)
+    {
+        if (deps_.configService == nullptr)
+        {
+            console_.writeLine("ERR: ConfigService not available");
+            return;
+        }
+
+        if (Communication::CommandParser::equals(p.subverb, "show"))
+        {
+            const auto s = deps_.configService->snapshot();
+            console_.writeLine("");
+            console_.printf("Config schema version: 0x%04X\r\n", s.version);
+            console_.writeLine("[EMG]");
+            console_.printf("  thresholdOn       : %.3f\r\n", s.emg.thresholdOn);
+            console_.printf("  thresholdOff      : %.3f\r\n", s.emg.thresholdOff);
+            console_.printf("  debounceMs        : %u\r\n",   s.emg.debounceMs);
+            console_.printf("  doublePulseWinMs  : %u\r\n",   s.emg.doublePulseWindowMs);
+            console_.printf("  longHoldMs        : %u\r\n",   s.emg.longHoldMs);
+            console_.printf("  calibrationSampl. : %u\r\n",   s.emg.calibrationSamples);
+            console_.writeLine("[IMU]");
+            console_.printf("  complAlpha        : %.3f\r\n", s.imu.complementaryAlpha);
+            console_.printf("  planeThresholdG   : %.2f\r\n", s.imu.planeThresholdG);
+            console_.printf("  sampleRateDiv     : %u\r\n",   s.imu.sampleRateDiv);
+            console_.printf("  calibrationSampl. : %u\r\n",   s.imu.calibrationSamples);
+            console_.writeLine("[MOTION]");
+            console_.printf("  defaultSpeedDps   : %.1f\r\n", s.motion.defaultSpeedDps);
+            console_.printf("  hand open / close : %.1f / %.1f\r\n",
+                            s.motion.handOpenAngle, s.motion.handCloseAngle);
+            console_.printf("  wrist L / R       : %.1f / %.1f\r\n",
+                            s.motion.wristLeftAngle, s.motion.wristRightAngle);
+            console_.printf("  elbow XY/XZ/YZ    : %.1f / %.1f / %.1f\r\n",
+                            s.motion.elbowXyAngle, s.motion.elbowXzAngle,
+                            s.motion.elbowYzAngle);
+            console_.printf("  home angles       : [%.1f %.1f %.1f %.1f %.1f]\r\n",
+                            s.motion.homeAngles[0], s.motion.homeAngles[1],
+                            s.motion.homeAngles[2], s.motion.homeAngles[3],
+                            s.motion.homeAngles[4]);
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "save"))
+        {
+            const bool ok = deps_.configService->save();
+            console_.writeLine(ok ? "OK: config saved to NVS"
+                                  : "ERR: config save failed");
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "load"))
+        {
+            const bool ok = deps_.configService->reload();
+            console_.writeLine(ok ? "OK: config reloaded from NVS"
+                                  : "ERR: no valid config in NVS");
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "reset"))
+        {
+            deps_.configService->resetToDefaults();
+            console_.writeLine("OK: defaults restored (run 'config save' to persist)");
+        }
+        else
+        {
+            console_.writeLine("ERR: config show | save | load | reset");
+        }
+    }
+
+    // ==================================================================
+    // CAL — persistencia de calibraciones (Etapa 10)
+    //   cal show   -> imprime offsets y baseline guardados
+    //   cal save   -> persiste calibración actual a NVS
+    //   cal load   -> recarga desde NVS y aplica
+    //   cal reset  -> borra calibración persistida
+    // ==================================================================
+    void CLIService::cmdCal(const Communication::ParsedCommand& p)
+    {
+        if (deps_.calibrationMgr == nullptr)
+        {
+            console_.writeLine("ERR: CalibrationManager not available");
+            return;
+        }
+
+        if (Communication::CommandParser::equals(p.subverb, "show"))
+        {
+            const auto d = deps_.calibrationMgr->snapshot();
+            console_.writeLine("");
+            console_.printf("Calibration schema version: 0x%04X\r\n", d.version);
+            console_.printf("IMU valid: %s\r\n", d.imuValid ? "YES" : "no");
+            if (d.imuValid)
+            {
+                console_.printf("  A offsets [g]   : %.4f %.4f %.4f\r\n",
+                                d.imu.ax, d.imu.ay, d.imu.az);
+                console_.printf("  G offsets [dps] : %.3f %.3f %.3f\r\n",
+                                d.imu.gx, d.imu.gy, d.imu.gz);
+            }
+            console_.printf("EMG valid: %s\r\n", d.emgValid ? "YES" : "no");
+            if (d.emgValid)
+            {
+                console_.printf("  baseline : %.4f\r\n", d.emg.baseline);
+                console_.printf("  peakNorm : %.4f\r\n", d.emg.peakNorm);
+            }
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "save"))
+        {
+            const bool ok = deps_.calibrationMgr->save();
+            console_.writeLine(ok ? "OK: calibration saved to NVS"
+                                  : "ERR: save failed");
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "load"))
+        {
+            const bool ok = deps_.calibrationMgr->loadAndApply();
+            console_.writeLine(ok ? "OK: calibration loaded & applied"
+                                  : "ERR: no valid calibration in NVS");
+        }
+        else if (Communication::CommandParser::equals(p.subverb, "reset"))
+        {
+            const bool ok = deps_.calibrationMgr->reset();
+            console_.writeLine(ok ? "OK: calibration cleared"
+                                  : "ERR: nothing to clear");
+        }
+        else
+        {
+            console_.writeLine("ERR: cal show | save | load | reset");
         }
     }
 }

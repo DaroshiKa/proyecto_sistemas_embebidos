@@ -67,8 +67,10 @@ namespace HAL
 
     bool ADCHal::initializeContinuous(
         const ADCContinuousConfig& config
+        
     )
     {
+        
         if (continuousHandle_ != nullptr)
         {
             return true;
@@ -87,8 +89,29 @@ namespace HAL
             return false;
         }
 
+       uint32_t safeFreq = config.sampleRateHz;
+
+        if (safeFreq < 20000U)
+        {
+            ESP_LOGW(
+                TAG,
+                "Requested %lu Hz below ESP32 SAR min; clamping to 20 kHz",
+                static_cast<unsigned long>(safeFreq)
+            );
+            safeFreq = 20000U;
+        }
+        else if (safeFreq > 80000U)
+        {
+            ESP_LOGW(
+                TAG,
+                "Requested %lu Hz above ESP32 SAR max; clamping to 80 kHz",
+                static_cast<unsigned long>(safeFreq)
+            );
+            safeFreq = 80000U;
+        }
+
         adc_continuous_config_t dmaCfg {};
-        dmaCfg.sample_freq_hz = config.sampleRateHz;
+        dmaCfg.sample_freq_hz = safeFreq;
         dmaCfg.conv_mode      = ADC_CONV_SINGLE_UNIT_1;
         dmaCfg.format         = ADC_DIGI_OUTPUT_FORMAT_TYPE1;
 

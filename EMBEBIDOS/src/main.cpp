@@ -41,6 +41,9 @@
 #include "models/EMGConfig.hpp"
 #include "models/MotionConfig.hpp"
 #include "models/SafetyConfig.hpp"
+#include "services/NVSStorage.hpp"
+#include "services/ConfigService.hpp"
+#include "services/CalibrationManager.hpp"
 
 static const char* TAG = "MAIN";
 
@@ -57,6 +60,20 @@ static void watchdogCallback(void* arg)
 extern "C" void app_main(void)
 {
     ESP_LOGI(TAG, "Boot - Stage 9 Safety");
+
+    // =========================================================
+    // 0) Persistencia NVS — Etapa 10
+    //    Debe ser lo PRIMERO para que ConfigService pueda alimentar
+    //    los Configs antes de pasarlos a HAL/Services.
+    // =========================================================
+    if (!Services::NVSStorage::initBackend())
+    {
+        ESP_LOGE(TAG, "NVS backend init failed -> running with defaults");
+    }
+    static Services::NVSStorage configStore("cfg");
+    static Services::NVSStorage calStore("cal");
+    configStore.open();
+    calStore.open();
 
     // =========================================================
     // 1) Core: EventBus + Queues
@@ -81,6 +98,18 @@ extern "C" void app_main(void)
     Models::EMGConfig    emgCfg {};
     Models::MotionConfig motionCfg {};
     Models::SafetyConfig safetyCfg {};
+
+    // ConfigService aplica la persistencia ANTES de inicializar HW.
+    // Así los Configs que recibe el HAL ya traen los valores correctos.
+    Services::ConfigService::Targets cfgTargets {};
+    cfgTargets.imuCfg    = &imuCfg;
+    cfgTargets.emgCfg    = &emgCfg;
+    cfgTargets.motionCfg = &motionCfg;
+    cfgTargets.imuSvc    = nullptr;     // todavía no existen
+    cfgTargets.emgSvc    = nullptr;
+
+    static Services::ConfigService configService(configStore, cfgTargets);
+    configService.initialize();
 
     i2c.initialize(imuCfg.sdaPin, imuCfg.sclPin, imuCfg.busFrequencyHz);
 
@@ -113,6 +142,24 @@ extern "C" void app_main(void)
 
     const bool imuOk = imuService.initialize();
     const bool emgOk = emgService.initialize();
+
+    // Ahora que los servicios viven, le damos sus referencias al ConfigService
+    // para reconfiguración runtime (ej. emg setThresholds en caliente).
+    // No tenemos setter pero podemos reasignar via apply() futuro; por ahora,
+    // construimos el CalibrationManager y le pasamos los punteros vivos.
+    Services::CalibrationManager::Targets calTargets {};
+    calTargets.imuDriver = &mpu;
+    calTargets.emgSvc    = emgOk ? &emgService : nullptr;
+
+    static Services::CalibrationManager calibrationMgr(
+        calStore, calTargets, /*autoSaveOnComplete=*/ true);
+    calibrationMgr.initialize();
+
+    // Suscribir al EventBus para auto-save tras CALIBRATION_COMPLETE
+    eventBus.subscribe(&calibrationMgr);
+
+    // Cargar offsets persistidos (si existen) y aplicarlos a IMU+EMG
+    calibrationMgr.loadAndApply();
 
     // =========================================================
     // 5) SafetyService + Adapters + Validator
@@ -175,6 +222,8 @@ extern "C" void app_main(void)
     cliDeps.executor        = &servoManager;
     cliDeps.dispatcherStats = &dispatcher;
     cliDeps.safetyMonitor   = &safetyService;
+    cliDeps.configService   = &configService;
+    cliDeps.calibrationMgr  = &calibrationMgr;
 
     static Services::CLIService cliService(console, cliDeps);
     static App::DemoMode        demoMode(dispatcher);

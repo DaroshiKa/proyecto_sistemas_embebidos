@@ -12,12 +12,14 @@
 #include "interfaces/ISafetyMonitor.hpp"
 #include "models/MotionCommand.hpp"
 #include "models/ServoState.hpp"
+#include "services/ConfigService.hpp"
+#include "services/CalibrationManager.hpp"
 
 namespace Services
 {
     // Dependencias necesarias para que el CLI pueda diagnosticar
     // y emitir comandos. Inyección opcional (nullptr = capacidad ausente).
-   struct CLIDependencies
+  struct CLIDependencies
 {
     Interfaces::ICommandDispatcher*  dispatcher       { nullptr };
     Interfaces::IIMUSource*          imu              { nullptr };
@@ -25,8 +27,9 @@ namespace Services
     Interfaces::IMotionExecutor*     executor         { nullptr };
     Core::CommandDispatcher*         dispatcherStats  { nullptr };
     Interfaces::ISafetyMonitor*      safetyMonitor    { nullptr };
+    Interfaces::IConfigService*      configService    { nullptr };   // NUEVO
+    Services::CalibrationManager*    calibrationMgr   { nullptr };   // NUEVO
 };
-
     class CLIService
     {
     public:
@@ -35,6 +38,8 @@ namespace Services
             const CLIDependencies& deps
         );
 
+        void cmdConfig(const Communication::ParsedCommand& p);
+        void cmdCal(const Communication::ParsedCommand& p);
         // Procesa una línea recibida del usuario.
         void handleLine(const char* line);
 
