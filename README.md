@@ -8,7 +8,7 @@ Estas señales, aunque de baja intensidad, contienen suficiente información par
 
 Este proyecto piensa establecer un sistema embebido capaz de captar impulsos eléctricos musculares generados por el usuario y traducirlos en comandos de movimiento para una estructura robótica con forma de mano. El sistema deberá interpretar estos impulsos y determinar qué tipo de movimiento debe ejecutarse en distintas partes del mecanismo.
 
-A diferencia de sistemas más complejos que permiten control proporcional continuo, el sistema propuesto utilizará movimientos discretos predefinidos. Esto significa que las señales detectadas no indicarán la magnitud exacta del movimiento, sino que activarán acciones específicas como mover el codo en una dirección determinada, abrir o cerrar la mano, o mover la muñeca en alguno de sus ejes permitidos.
+A diferencia de sistemas más complejos que permiten control proporcional continuo, el sistema propuesto utilizará movimientos discretos predefinidos. Esto significa que las señales detectadas no indicarán la magnitud exacta del movimiento, sino que activarán acciones específicas como mover el codo en una dirección determinada depeniendo del sensado del giroscopio, abrir o cerrar la mano con el pulso del EGM, o mover la muñeca en alguno de sus ejes permitidos.
 
 Para lograr esto, el sistema deberá integrar sensores capaces de detectar los impulsos eléctricos musculares, un microcontrolador encargado del procesamiento de la señal y la toma de decisiones, y un conjunto de actuadores que permitan ejecutar los movimientos mecánicos correspondientes. Además, el sistema incluirá una interfaz de usuario mediante una pantalla que permitirá ajustar parámetros de funcionamiento como la velocidad de los movimientos y la sensibilidad con la que se detectan los impulsos eléctricos.
 
@@ -44,7 +44,7 @@ Los movimientos de la mano robótica serán discretos y predefinidos, por lo que
 
 Entre los movimientos contemplados en el proyecto se encuentran:
 
--Movimiento del codo en el eje XY.
+-Movimiento del codo en ángulos predispuestos (45°, 90° y 135°).
 
 -Apertura y cierre de la mano representado en dos posiciones posibles.
 
